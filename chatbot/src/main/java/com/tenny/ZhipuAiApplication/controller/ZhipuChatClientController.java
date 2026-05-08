@@ -1,5 +1,8 @@
 package com.tenny.ZhipuAiApplication.controller;
 
+import com.tenny.ZhipuAiApplication.advisor.SGCallAdvisor1;
+import com.tenny.ZhipuAiApplication.advisor.SGCallAdvisor2;
+import com.tenny.ZhipuAiApplication.advisor.SimpleMessageChatMemoryAdvisor;
 import com.tenny.ZhipuAiApplication.entity.Book;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -73,4 +76,25 @@ public class ZhipuChatClientController {
                 .stream()
                 .content();
     }
+
+    @GetMapping("advisor")
+    public Book advisor(){
+        return chatClient
+                .prompt()
+                .user("给我随机生成一本书，要求书名和作者都是中文")
+                .advisors(new SGCallAdvisor1(), new SGCallAdvisor2())
+                .call()
+                .entity(Book.class);
+    }
+
+    @GetMapping("SimpleMessageChatMemory")
+    public String SimpleMessageChatMemory(@RequestParam("query") String query){
+        return chatClient
+                .prompt()
+                .user(query)
+                .advisors(new SimpleMessageChatMemoryAdvisor())
+                .call()
+                .content();
+    }
+
 }
