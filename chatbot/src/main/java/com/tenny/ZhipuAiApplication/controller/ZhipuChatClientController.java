@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 @RestController
 @RequestMapping("chatClient")
@@ -87,11 +88,17 @@ public class ZhipuChatClientController {
                 .entity(Book.class);
     }
 
-    @GetMapping("SimpleMessageChatMemory")
-    public String SimpleMessageChatMemory(@RequestParam("query") String query){
+    @GetMapping("simpleMessageChatMemory")
+    public String simpleMessageChatMemory(@RequestParam("query") String query, @RequestParam("conversationId") String conversationId){
         return chatClient
                 .prompt()
                 .user(query)
+                .advisors(new Consumer<ChatClient.AdvisorSpec>() {
+                    @Override
+                    public void accept(ChatClient.AdvisorSpec advisorSpec) {
+                        advisorSpec.param("conversationId", conversationId);
+                    }
+                })
                 .advisors(new SimpleMessageChatMemoryAdvisor())
                 .call()
                 .content();

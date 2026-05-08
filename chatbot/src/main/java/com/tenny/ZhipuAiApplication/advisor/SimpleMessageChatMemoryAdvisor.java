@@ -16,7 +16,7 @@ public class SimpleMessageChatMemoryAdvisor implements BaseAdvisor {
 
     @Override
     public ChatClientRequest before(ChatClientRequest chatClientRequest, AdvisorChain advisorChain) {
-        String conversationId = "tenny";
+        String conversationId = chatClientRequest.context().get("conversationId").toString();
         List<Message> messages = chatMemory.get(conversationId);
         if (messages == null){
             messages = new ArrayList<>();
@@ -34,7 +34,7 @@ public class SimpleMessageChatMemoryAdvisor implements BaseAdvisor {
 
     @Override
     public ChatClientResponse after(ChatClientResponse chatClientResponse, AdvisorChain advisorChain) {
-        String conversationId = "tenny";
+        String conversationId = chatClientResponse.context().get("conversationId").toString();
         List<Message> messages = chatMemory.get(conversationId);
         if (messages == null){
             messages = new ArrayList<>();
