@@ -1,0 +1,30 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      enabled: true
+      charset: utf-8
+      force: true
+
+spring:
+  ai:
+    zhipuai:
+      api-key: ${ZHIPUAI_API_KEY}  # 你的智谱AI API Key
+      chat:
+        options:
+          model: glm-4-flash      # 使用的模型，推荐性价比高的 glm-4-flash
+          temperature: 0.7        # 控制生成文本的随机性（范围 0-1）
+      embedding:
+        options:
+          model: embedding-3
+          dimensions: 256
+    vectorstore:
+      redis:
+        initialize-schema: true   # 首次启动时自动创建索引和结构，非常重要
+        index: tenny_rag_index  # 索引名称，默认是 'spring-ai-index'
+        prefix: tenny_rag_prefix           # Redis Key 的前缀，默认是 'embedding:'
+
+  data:
+    redis:
+      host: localhost
+      port: 6379

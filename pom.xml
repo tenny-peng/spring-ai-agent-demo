@@ -32,6 +32,7 @@
     <description>ai agent example using Spring AI Alibaba</description>
     <modules>
         <module>chatbot</module>
+        <module>rag</module>
     </modules>
 
     <properties>
