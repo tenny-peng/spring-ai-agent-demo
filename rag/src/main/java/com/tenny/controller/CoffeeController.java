@@ -1,5 +1,6 @@
 package com.tenny.controller;
 
+import com.tenny.tool.TimeTool;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -43,6 +44,7 @@ public class CoffeeController {
 
         this.chatClient = clientBuilder
                 .defaultAdvisors(retrievalAugmentationAdvisor)
+                .defaultTools(new TimeTool())
                 .build();
     }
 
@@ -84,7 +86,7 @@ public class CoffeeController {
     @GetMapping("rag-ask")
     public String ragAsk(@RequestParam("question") String question){
         return chatClient.prompt()
-                .system("你是一个咖啡店的服务员，你需要回答用户的问题")
+                .system("你是一个咖啡店的服务员，你需要回答用户的问题。当用户询问时间相关问题时，请使用工具来获取准确的时间。对于咖啡相关的问题，请基于知识库回答")
                 .user(question)
                 .call()
                 .content();
