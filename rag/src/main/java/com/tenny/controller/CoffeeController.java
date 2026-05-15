@@ -9,6 +9,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,7 +31,7 @@ public class CoffeeController {
 
     private final ChatClient chatClient;
 
-    public CoffeeController(VectorStore vectorStore, ChatClient.Builder clientBuilder) {
+    public CoffeeController(VectorStore vectorStore, ChatClient.Builder clientBuilder, ToolCallbackProvider toolCallbackProvider) {
         this.vectorStore = vectorStore;
 
         VectorStoreDocumentRetriever vectorStoreDocumentRetriever = VectorStoreDocumentRetriever
@@ -44,7 +45,8 @@ public class CoffeeController {
 
         this.chatClient = clientBuilder
                 .defaultAdvisors(retrievalAugmentationAdvisor)
-                .defaultTools(new TimeTool())
+//                .defaultTools(new TimeTool())
+                .defaultToolCallbacks(toolCallbackProvider.getToolCallbacks())
                 .build();
     }
 

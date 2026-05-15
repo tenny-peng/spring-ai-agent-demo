@@ -33,6 +33,7 @@
     <modules>
         <module>chatbot</module>
         <module>rag</module>
+        <module>mcp-server</module>
     </modules>
 
     <properties>

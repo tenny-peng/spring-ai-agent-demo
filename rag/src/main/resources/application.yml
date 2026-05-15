@@ -23,7 +23,12 @@ spring:
         initialize-schema: true   # 首次启动时自动创建索引和结构，非常重要
         index: tenny_rag_index  # 索引名称，默认是 'spring-ai-index'
         prefix: tenny_rag_prefix           # Redis Key 的前缀，默认是 'embedding:'
-
+    mcp:
+      client:
+        sse:
+          connections:
+            server1:
+              url: http://localhost:8888
   data:
     redis:
       host: localhost
