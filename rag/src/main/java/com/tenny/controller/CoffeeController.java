@@ -94,4 +94,13 @@ public class CoffeeController {
                 .content();
     }
 
+    @GetMapping("fetcher")
+    public String fetcher(@RequestParam("question") String question){
+        return chatClient.prompt()
+                .system("你是一个网页爬取专家，你可以运用工具爬取指定网页内容并进行总结")
+                .user(question)
+                .call()
+                .content();
+    }
+
 }

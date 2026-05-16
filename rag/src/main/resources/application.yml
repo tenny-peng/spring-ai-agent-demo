@@ -29,6 +29,8 @@ spring:
           connections:
             server1:
               url: http://localhost:8888
+            fetcher-server:
+              url: http://localhost:3000
   data:
     redis:
       host: localhost
