@@ -21,10 +21,12 @@ public class GraphController {
     private static final Logger log = LoggerFactory.getLogger(GraphController.class);
     private final CompiledGraph compiledGraph;
     private final CompiledGraph simpleGraph;
+    private final CompiledGraph conditionalGraph;
 
-    public GraphController(@Qualifier("quickStartGraph") CompiledGraph compiledGraph, @Qualifier("simpleGraph") CompiledGraph simpleGraph) {
+    public GraphController(@Qualifier("quickStartGraph") CompiledGraph compiledGraph, @Qualifier("simpleGraph") CompiledGraph simpleGraph, @Qualifier("conditionalGraph") CompiledGraph conditionalGraph) {
         this.compiledGraph = compiledGraph;
         this.simpleGraph = simpleGraph;
+        this.conditionalGraph = conditionalGraph;
     }
 
     @GetMapping("quickStartGraph")
@@ -40,5 +42,13 @@ public class GraphController {
         Map<String, Object> data = optionalOverAllState.map(OverAllState::data).orElse(Map.of());
         return data;
     }
+
+    @GetMapping("conditionalGraph")
+    public Map<String, Object> conditionalGraph(@RequestParam("topic") String topic) {
+        Optional<OverAllState> optionalOverAllState = conditionalGraph.invoke(Map.of("topic", topic));
+        Map<String, Object> data = optionalOverAllState.map(OverAllState::data).orElse(Map.of());
+        return data;
+    }
+
 
 }

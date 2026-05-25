@@ -1,12 +1,13 @@
 package com.tenny.config;
 
 import com.alibaba.cloud.ai.graph.*;
+import com.alibaba.cloud.ai.graph.action.AsyncEdgeAction;
 import com.alibaba.cloud.ai.graph.action.AsyncNodeAction;
+import com.alibaba.cloud.ai.graph.action.EdgeAction;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
-import com.tenny.node.SentenceConstructionNode;
-import com.tenny.node.TranslationNode;
+import com.tenny.node.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -73,6 +74,29 @@ public class GraphConfig {
         stateGraph.addEdge("SentenceConstructionNode", "TranslationNode");
         stateGraph.addEdge("TranslationNode", StateGraph.END);
 
+        return stateGraph.compile();
+    }
+
+
+    @Bean("conditionalGraph")
+    public CompiledGraph conditionalGraph(ChatClient.Builder builder) throws GraphStateException {
+        KeyStrategyFactory keyStrategyFactory = () -> Map.of("topic", new ReplaceStrategy());
+
+        StateGraph stateGraph = new StateGraph("conditionalGraph", keyStrategyFactory);
+
+        stateGraph.addNode("GenerateJokeNode", AsyncNodeAction.node_async(new GenerateJokeNode(builder)));
+        stateGraph.addNode("EvaluateJokeNode", AsyncNodeAction.node_async(new EvaluateJokeNode(builder)));
+        stateGraph.addNode("EnhanceJokeNode", AsyncNodeAction.node_async(new EnhanceJokeNode(builder)));
+
+        stateGraph.addEdge(StateGraph.START, "GenerateJokeNode");
+        stateGraph.addEdge("GenerateJokeNode", "EvaluateJokeNode");
+        stateGraph.addConditionalEdges("EvaluateJokeNode", AsyncEdgeAction.edge_async(new EdgeAction() {
+            @Override
+            public String apply(OverAllState state) throws Exception {
+                return state.value("result", "优秀");
+            }
+        }), Map.of("优秀", StateGraph.END, "不够优秀", "EnhanceJokeNode"));
+        stateGraph.addEdge("EnhanceJokeNode", StateGraph.END);
         return stateGraph.compile();
     }
 }
