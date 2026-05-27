@@ -14,6 +14,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.ArrayList;
 import java.util.Map;
 
 @Configuration
@@ -97,6 +98,47 @@ public class GraphConfig {
             }
         }), Map.of("优秀", StateGraph.END, "不够优秀", "EnhanceJokeNode"));
         stateGraph.addEdge("EnhanceJokeNode", StateGraph.END);
+        return stateGraph.compile();
+    }
+
+    @Bean("loopGraph")
+    public CompiledGraph loopGraph(ChatClient.Builder builder) throws GraphStateException {
+        KeyStrategyFactory keyStrategyFactory = () -> Map.of("topic", new ReplaceStrategy());
+
+        StateGraph stateGraph = new StateGraph("loopGraph", keyStrategyFactory);
+
+        stateGraph.addNode("GenerateJokeNode", AsyncNodeAction.node_async(new GenerateJokeNode(builder)));
+        stateGraph.addNode("LoopEvaluateJokeNode", AsyncNodeAction.node_async(new LoopEvaluateJokeNode(builder, 7, 3)));
+
+        stateGraph.addEdge(StateGraph.START, "GenerateJokeNode");
+        stateGraph.addEdge("GenerateJokeNode", "LoopEvaluateJokeNode");
+        stateGraph.addConditionalEdges("LoopEvaluateJokeNode", AsyncEdgeAction.edge_async(new EdgeAction() {
+            @Override
+            public String apply(OverAllState state) throws Exception {
+                return state.value("result", "break");
+            }
+        }), Map.of("break", StateGraph.END, "loop", "GenerateJokeNode"));
+        return stateGraph.compile();
+    }
+
+    @Bean("saveGraph")
+    public CompiledGraph saveGraph(ChatClient.Builder builder) throws GraphStateException {
+        KeyStrategyFactory keyStrategyFactory = () -> Map.of();
+
+        StateGraph stateGraph = new StateGraph("saveGraph", keyStrategyFactory);
+
+        stateGraph.addNode("saveConversation", AsyncNodeAction.node_async(new NodeAction() {
+            @Override
+            public Map<String, Object> apply(OverAllState state) throws Exception {
+                String msg = state.value("msg", "");
+                ArrayList<Object> historyMsg = state.value("historyMsg", new ArrayList<>());
+                historyMsg.add(msg);
+                return Map.of("historyMsg", historyMsg);
+            }
+        }));
+
+        stateGraph.addEdge(StateGraph.START, "saveConversation");
+        stateGraph.addEdge("saveConversation", StateGraph.END);
         return stateGraph.compile();
     }
 }
