@@ -118,7 +118,16 @@ public class GraphConfig {
                 return state.value("result", "break");
             }
         }), Map.of("break", StateGraph.END, "loop", "GenerateJokeNode"));
-        return stateGraph.compile();
+        CompiledGraph compiledGraph = stateGraph.compile();
+
+        GraphRepresentation representation = compiledGraph.getGraph(
+                GraphRepresentation.Type.PLANTUML,  // 可选: PLANTUML 或 MERMAID
+                "loopGraph"                      // 图的标题
+        );
+        System.out.println("\n=== 图的可视化代码 (PlantUML) ===");
+        System.out.println(representation.content());
+        System.out.println("==================================\n");
+        return compiledGraph;
     }
 
     @Bean("saveGraph")
@@ -139,6 +148,16 @@ public class GraphConfig {
 
         stateGraph.addEdge(StateGraph.START, "saveConversation");
         stateGraph.addEdge("saveConversation", StateGraph.END);
-        return stateGraph.compile();
+
+        CompiledGraph compiledGraph = stateGraph.compile();
+
+        GraphRepresentation representation = compiledGraph.getGraph(
+                GraphRepresentation.Type.PLANTUML,  // 可选: PLANTUML 或 MERMAID
+                "saveGraph"                      // 图的标题
+        );
+        System.out.println("\n=== 图的可视化代码 (PlantUML) ===");
+        System.out.println(representation.content());
+        System.out.println("==================================\n");
+        return compiledGraph;
     }
 }
