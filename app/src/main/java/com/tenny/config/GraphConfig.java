@@ -1,35 +1,37 @@
 package com.tenny.config;
 
-import com.alibaba.cloud.ai.graph.*;
-import com.alibaba.cloud.ai.graph.action.AsyncEdgeAction;
+import com.alibaba.cloud.ai.graph.CompileConfig;
+import com.alibaba.cloud.ai.graph.CompiledGraph;
+import com.alibaba.cloud.ai.graph.KeyStrategyFactory;
+import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.action.AsyncNodeAction;
-import com.alibaba.cloud.ai.graph.action.EdgeAction;
-import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig;
+import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
-import com.tenny.node.ChatNode;
+import com.tenny.graphnode.ChatNode;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.ArrayList;
 import java.util.Map;
 
 @Slf4j
 @Configuration
+@RequiredArgsConstructor
 public class GraphConfig {
+
+    private final RedissonClient redissonClient;
 
     @Bean("chatbotGraph")
     public CompiledGraph chatbotGraph(ChatClient.Builder builder) throws GraphStateException {
-        KeyStrategyFactory keyStrategyFactory = new KeyStrategyFactory() {
-            @Override
-            public Map<String, KeyStrategy> apply() {
-                return Map.of("query", new ReplaceStrategy());
-            }
-        };
+        KeyStrategyFactory keyStrategyFactory = () -> Map.of(
+                "query", new ReplaceStrategy(),
+                "output", new ReplaceStrategy()
+        );
 
         StateGraph stateGraph = new StateGraph("chatbotGraph", keyStrategyFactory);
 
@@ -38,7 +40,13 @@ public class GraphConfig {
         stateGraph.addEdge(StateGraph.START, "ChatNode");
         stateGraph.addEdge("ChatNode", StateGraph.END);
 
-        return stateGraph.compile();
+        SaverConfig saverConfig = SaverConfig.builder()
+                .register(RedisSaver.builder().redisson(redissonClient).build())
+                .build();
+
+        return stateGraph.compile(CompileConfig.builder()
+                .saverConfig(saverConfig)
+                .build());
     }
 
 }
