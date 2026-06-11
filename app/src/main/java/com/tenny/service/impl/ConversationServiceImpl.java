@@ -115,6 +115,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                 .map(so -> {
                     Object data = so.getOriginData();
                     if (data instanceof String text) {
+                        log.info("text: {}", text);
                         fullResponse.append(text);
                         return text;
                     }
@@ -137,6 +138,10 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
     @Override
     public Map<String, Object> getMessages(String conversationId) {
+        Conversation conversation = getOne(new LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId));
+        if(conversation == null){
+            return Map.of("messages", List.of());
+        }
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(conversationId)
                 .build();
@@ -152,8 +157,8 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
     @Override
     @Transactional
-    public void delete(Long id, Long userId) {
-        removeById(id);
+    public void deleteByConversationId(String conversationId) {
+        remove(new LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId));
     }
 
     @Override

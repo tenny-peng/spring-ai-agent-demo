@@ -6,12 +6,12 @@ import { useState } from 'react';
 function SessionList({ sessions, currentSessionId, onSelectSession, onNewSession, onDeleteSession }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  const handleDelete = (sessionId, e) => {
+  const handleDelete = (conversationId, e) => {
     e.stopPropagation();
     Modal.confirm({
       title: '确认删除',
       content: '删除后无法恢复，确定要删除这个会话吗？',
-      onOk: () => onDeleteSession(sessionId),
+      onOk: () => onDeleteSession(conversationId),
     });
   };
 
@@ -31,10 +31,10 @@ function SessionList({ sessions, currentSessionId, onSelectSession, onNewSession
         dataSource={sessions}
         renderItem={session => (
           <List.Item
-            onClick={() => onSelectSession(session.id)}
+            onClick={() => onSelectSession(session.conversationId)}
             style={{
               cursor: 'pointer',
-              background: currentSessionId === session.id ? '#e6f7ff' : 'transparent',
+              background: currentSessionId === session.conversationId ? '#e6f7ff' : 'transparent',
               padding: '12px 16px',
               borderBottom: '1px solid #f0f0f0'
             }}
@@ -42,14 +42,14 @@ function SessionList({ sessions, currentSessionId, onSelectSession, onNewSession
               <DeleteOutlined
                 key="delete"
                 style={{ color: '#ff4d4f', cursor: 'pointer' }}
-                onClick={(e) => handleDelete(session.id, e)}
+                onClick={(e) => handleDelete(session.conversationId, e)}
               />
             ]}
           >
             <List.Item.Meta
               avatar={<Avatar icon={<MessageOutlined />} />}
               title={session.title || '新对话'}
-              description={session.lastTime || '刚刚'}
+              description={session.updatedAt || '刚刚'}
             />
           </List.Item>
         )}

@@ -21,10 +21,11 @@ function Chat() {
   // 加载会话列表
   const loadSessions = async () => {
     try {
-      const response = await client.get('/sessions');
-      setSessions(response.data);  // 假设返回数组
-      if (response.data.length > 0 && !currentSessionId) {
-        setCurrentSessionId(response.data[0].id);
+      const response = await client.get('/conversation/list');
+      const sessionsData = response.data;
+      setSessions(sessionsData);
+      if (sessionsData.length > 0 && !currentSessionId) {
+        setCurrentSessionId(sessionsData[0].conversationId);
       }
     } catch (error) {
       message.error('加载会话列表失败');
@@ -32,38 +33,67 @@ function Chat() {
   };
 
   // 加载历史消息
-  const loadMessages = async (sessionId) => {
+  const loadMessages = async (conversationId) => {
     try {
-      const response = await client.get(`/sessions/${sessionId}/messages`);
-      setMessages(response.data);  // 假设返回 [{ role, content }, ...]
+      const response = await client.get(`/conversation/messages/${conversationId}`);
+      const messagesData = response.data?.messages || [];
+      const formattedMessages = messagesData.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+      setMessages(formattedMessages);
     } catch (error) {
-      message.error('加载历史消息失败');
+      console.error('加载历史消息失败:', error);
+      setMessages([]);
     }
   };
 
-  // 创建新会话
-  const handleNewSession = async () => {
-    try {
-      const response = await client.post('/sessions', { title: '新对话' });
-      setSessions([response.data, ...sessions]);
-      setCurrentSessionId(response.data.id);
+    const handleNewSession = () => {
+      // 生成临时 ID（用时间戳 + 随机数）
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+      const tempSession = {
+        conversationId: tempId,      // 临时 ID
+        title: '新对话',
+        updatedAt: new Date().toISOString(),
+        isTemp: true                  // 标记为临时会话
+      };
+
+      // 添加到会话列表最前面
+      setSessions([tempSession, ...sessions]);
+      setCurrentSessionId(tempId);
       setMessages([]);
-      message.success('新会话创建成功');
-    } catch (error) {
-      message.error('创建会话失败');
-    }
-  };
+    };
 
   // 删除会话
-  const handleDeleteSession = async (sessionId) => {
-    try {
-      await client.delete(`/sessions/${sessionId}`);
-      // 更新前端状态...
-      message.success('删除成功');
-    } catch (error) {
-      message.error('删除失败');
-    }
-  };
+  const handleDeleteSession = async (conversationId) => {
+      // 临时会话直接删除
+      const session = sessions.find(s => s.conversationId === conversationId);
+      if (session?.isTemp) {
+        const newSessions = sessions.filter(s => s.conversationId !== conversationId);
+        setSessions(newSessions);
+        if (currentSessionId === conversationId) {
+          setCurrentSessionId(newSessions[0]?.conversationId || null);
+          if (newSessions.length === 0) setMessages([]);
+        }
+        message.success('删除成功');
+        return;
+      }
+
+      // 真实会话调用后端删除
+      try {
+        await client.delete(`/conversation/delete/${conversationId}`);
+        const newSessions = sessions.filter(s => s.conversationId !== conversationId);
+        setSessions(newSessions);
+        if (currentSessionId === conversationId) {
+          setCurrentSessionId(newSessions[0]?.conversationId || null);
+          if (newSessions.length === 0) setMessages([]);
+        }
+        message.success('删除成功');
+      } catch (error) {
+        message.error('删除失败');
+      }
+    };
 
   // 发送消息
   const handleSendMessage = async (content) => {
@@ -77,19 +107,87 @@ function Chat() {
     setLoading(true);
 
     try {
-      const response = await client.post('/chat', {
-        sessionId: currentSessionId,
-        message: content
-      });
+      const currentSession = sessions.find(s => s.conversationId === currentSessionId);
+      let conversationIdToUse = currentSessionId;
 
-      const aiMessage = { role: 'assistant', content: response.data.reply };
-      setMessages(prev => [...prev, aiMessage]);
+      // 如果是临时会话，用临时 ID 发送（后端会自动创建并返回新 ID）
+      await sendMessageWithSSE(conversationIdToUse, content);
     } catch (error) {
+      console.error('发送失败:', error);
       message.error('发送失败，请重试');
+      // 移除刚添加的用户消息和空的 AI 消息
+      setMessages(prev => prev.slice(0, -2));
     } finally {
       setLoading(false);
     }
   };
+
+    // SSE 流式发送消息（使用 fetch + ReadableStream）
+    const sendMessageWithSSE = async (conversationId, query) => {
+      const token = localStorage.getItem('token');
+      const baseURL = client.defaults.baseURL;
+
+      // 添加占位的 AI 消息
+      let aiMessageIndex = null;
+      setMessages(prev => {
+        aiMessageIndex = prev.length;
+        return [...prev, { role: 'assistant', content: '' }];
+      });
+
+      try {
+        const response = await fetch(`${baseURL}/conversation/chat?message=${encodeURIComponent(query)}&conversationId=${conversationId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'text/event-stream'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const newConversationId = response.headers.get('X-Conversation-Id');
+        if(newConversationId){
+            setCurrentSessionId(newConversationId);
+            setSessions(prev => prev.map(s =>
+                s.conversationId === conversationId
+                  ? { ...s, conversationId: newConversationId, isTemp: false }
+                  : s
+              ));
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+
+              setMessages(prev => {
+                const newMessages = [...prev];
+                if (newMessages[aiMessageIndex]) {
+                  newMessages[aiMessageIndex].content += data;
+                }
+                return newMessages;
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('SSE 错误:', error);
+        throw error;
+      }
+    };
+
 
   // 退出登录
   const handleLogout = () => {
@@ -103,11 +201,19 @@ function Chat() {
     loadSessions();
   }, []);
 
-  useEffect(() => {
-    if (currentSessionId) {
+    // 切换会话时加载历史消息
+    useEffect(() => {
+      if (!currentSessionId) return;
+
+      // 判断是否是临时会话（以 temp_ 开头）
+      if (currentSessionId.startsWith('temp_')) {
+        setMessages([]);  // 临时会话清空消息，不请求后端
+        return;
+      }
+
+      // 真实会话才加载历史消息
       loadMessages(currentSessionId);
-    }
-  }, [currentSessionId]);
+    }, [currentSessionId]);
 
   return (
     <Layout style={{ height: '100vh' }}>

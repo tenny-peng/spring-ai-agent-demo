@@ -19,7 +19,7 @@ public interface ConversationService extends IService<Conversation> {
 
     Map<String, Object> getMessages(String conversationId);
 
-    void delete(Long id, Long userId);
+    void deleteByConversationId(String conversationId);
 
     void rename(String conversationId, String newTitle);
 

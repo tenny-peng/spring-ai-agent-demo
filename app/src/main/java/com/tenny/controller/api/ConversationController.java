@@ -25,14 +25,14 @@ public class ConversationController {
 
     @GetMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @AuthRequired
-    public Flux<String> chat(@RequestParam String query, @RequestParam(required = false) String conversationId, HttpServletResponse response) {
-        if(StringUtils.isEmpty(conversationId)){
+    public Flux<String> chat(@RequestParam String message, @RequestParam(required = false) String conversationId, HttpServletResponse response) {
+        if(StringUtils.isEmpty(conversationId) || conversationId.startsWith("temp_")){
             Conversation conversation = conversationService.create();
             conversationId = conversation.getConversationId();
             response.setHeader("X-Conversation-Id", conversationId);
-            conversationService.generateTitleAsync(conversationId, query);
+            conversationService.generateTitleAsync(conversationId, message);
         }
-        return conversationService.chat(query, conversationId);
+        return conversationService.chat(message, conversationId);
     }
 
     @GetMapping("/list")
@@ -41,20 +41,23 @@ public class ConversationController {
         return ApiResult.success(conversationService.listByUserId(UserContext.getUserId()));
     }
 
-    @GetMapping("/messages/{id}")
+    @GetMapping("/messages/{conversationId}")
     @AuthRequired
     public ApiResult<Map<String, Object>> messages(@PathVariable String conversationId) {
+        if(StringUtils.isEmpty(conversationId)){
+            return ApiResult.success(Map.of("messages", List.of()));
+        }
         return ApiResult.success(conversationService.getMessages(conversationId));
     }
 
-    @DeleteMapping("/delete/{id}")
+    @DeleteMapping("/delete/{conversationId}")
     @AuthRequired
-    public ApiResult<Void> delete(@PathVariable Long id) {
-        conversationService.delete(id, UserContext.getUserId());
+    public ApiResult<Void> delete(@PathVariable String conversationId) {
+        conversationService.deleteByConversationId(conversationId);
         return ApiResult.success(null);
     }
 
-    @PatchMapping("/rename/{id}")
+    @PostMapping("/rename")
     @AuthRequired
     public ApiResult<Void> rename(@RequestBody ChangeTitleReq changeTitleReq) {
         conversationService.rename(changeTitleReq.getConversationId(), changeTitleReq.getNewTitle());

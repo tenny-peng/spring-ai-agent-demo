@@ -2,11 +2,11 @@
 import axios from 'axios';
 
 const client = axios.create({
-  baseURL: 'http://localhost:8080/api',  // 你的 Spring 后端地址
+  baseURL: 'http://localhost:8080/api',
   timeout: 30000,
 });
 
-// 请求拦截器：自动添加 token
+// 请求拦截器
 client.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -15,7 +15,7 @@ client.interceptors.request.use(config => {
   return config;
 });
 
-// 响应拦截器：处理错误
+// 响应拦截器
 client.interceptors.response.use(
   response => response.data,
   error => {
