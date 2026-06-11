@@ -5,7 +5,7 @@ import com.tenny.entity.User;
 import com.tenny.entity.dto.LoginResponse;
 
 public interface UserService extends IService<User> {
-    User register(String username, String password);
+    User register(String username,  String email, String password);
     LoginResponse login(String username, String password);
     void logout(String token);
 }

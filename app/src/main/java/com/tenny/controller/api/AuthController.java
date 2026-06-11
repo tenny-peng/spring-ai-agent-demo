@@ -21,11 +21,8 @@ public class AuthController {
 
     @PostMapping("/register")
     public ApiResult<?> register(@RequestBody AuthRequest request) {
-        if (request.getConfirmPassword() == null || !request.getConfirmPassword().equals(request.getPassword())) {
-            return ApiResult.error(400, "两次密码不一致");
-        }
         try {
-            User user = userService.register(request.getUsername(), request.getPassword());
+            User user = userService.register(request.getUsername(), request.getEmail(), request.getPassword());
             LoginResponse loginResponse = new LoginResponse();
             BeanUtils.copyProperties(user, loginResponse);
             return ApiResult.success(loginResponse);

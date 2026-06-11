@@ -28,13 +28,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Override
-    public User register(String username, String password) {
+    public User register(String username, String email, String password) {
         User existing = lambdaQuery().eq(User::getUsername, username).one();
         if (existing != null) {
             throw new RuntimeException("用户名已存在");
         }
+        existing = lambdaQuery().eq(User::getEmail, email).one();
+        if (existing != null) {
+            throw new RuntimeException("邮箱已存在");
+        }
         User user = new User();
         user.setUsername(username);
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
