@@ -29,8 +29,9 @@ public class GraphConfig {
     @Bean("chatbotGraph")
     public CompiledGraph chatbotGraph(ChatClient.Builder builder) throws GraphStateException {
         KeyStrategyFactory keyStrategyFactory = () -> Map.of(
-                "query", new ReplaceStrategy(),
-                "output", new ReplaceStrategy()
+                "message", new ReplaceStrategy(),
+                "assistant", new ReplaceStrategy(),
+                "messages", new ReplaceStrategy()
         );
 
         StateGraph stateGraph = new StateGraph("chatbotGraph", keyStrategyFactory);

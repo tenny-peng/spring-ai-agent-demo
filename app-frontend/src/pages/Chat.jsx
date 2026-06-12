@@ -17,6 +17,7 @@ function Chat() {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   // 加载会话列表
   const loadSessions = async () => {
@@ -38,8 +39,8 @@ function Chat() {
       const response = await client.get(`/conversation/messages/${conversationId}`);
       const messagesData = response.data?.messages || [];
       const formattedMessages = messagesData.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'assistant',
-        content: msg.content
+        role: msg.messageType === 'USER' ? 'USER' : 'ASSISTANT',
+        content: msg.text
       }));
       setMessages(formattedMessages);
     } catch (error) {
@@ -102,7 +103,7 @@ function Chat() {
       return;
     }
 
-    const userMessage = { role: 'user', content };
+    const userMessage = { role: 'USER', content };
     setMessages(prev => [...prev, userMessage]);
     setLoading(true);
 
@@ -112,6 +113,7 @@ function Chat() {
 
       // 如果是临时会话，用临时 ID 发送（后端会自动创建并返回新 ID）
       await sendMessageWithSSE(conversationIdToUse, content);
+      await loadSessions();
     } catch (error) {
       console.error('发送失败:', error);
       message.error('发送失败，请重试');
@@ -124,6 +126,7 @@ function Chat() {
 
     // SSE 流式发送消息（使用 fetch + ReadableStream）
     const sendMessageWithSSE = async (conversationId, query) => {
+        setIsStreaming(true);
       const token = localStorage.getItem('token');
       const baseURL = client.defaults.baseURL;
 
@@ -154,6 +157,7 @@ function Chat() {
                   ? { ...s, conversationId: newConversationId, isTemp: false }
                   : s
               ));
+          startPollingTitle(newConversationId);
         }
 
         const reader = response.body.getReader();
@@ -164,7 +168,9 @@ function Chat() {
           const { done, value } = await reader.read();
           if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
+          const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
 
@@ -188,6 +194,36 @@ function Chat() {
       }
     };
 
+    const startPollingTitle = (conversationId) => {
+      let retries = 0;
+      const maxRetries = 30;  // 最多30次
+      const interval = 1000;   // 每秒检查一次
+
+      const timer = setInterval(async () => {
+        try {
+          // ⭐ 只获取这一个会话的信息
+          const response = await client.get(`/conversation/${conversationId}`);
+          const session = response.data;
+
+          // 检查标题是否已更新（不再是"新对话"）
+          if (session && session.title && session.title !== '新对话') {
+            // 更新会话列表中的标题
+            setSessions(prev => prev.map(s =>
+              s.conversationId === conversationId
+                ? { ...s, title: session.title }
+                : s
+            ));
+            clearInterval(timer);  // 停止轮询
+          } else if (++retries >= maxRetries) {
+            clearInterval(timer);
+          }
+        } catch (error) {
+          if (++retries >= maxRetries) {
+            clearInterval(timer);
+          }
+        }
+      }, interval);
+    };
 
   // 退出登录
   const handleLogout = () => {
@@ -204,6 +240,8 @@ function Chat() {
     // 切换会话时加载历史消息
     useEffect(() => {
       if (!currentSessionId) return;
+
+      if (isStreaming) return;
 
       // 判断是否是临时会话（以 temp_ 开头）
       if (currentSessionId.startsWith('temp_')) {

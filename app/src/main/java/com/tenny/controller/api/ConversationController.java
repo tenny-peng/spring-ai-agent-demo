@@ -30,7 +30,8 @@ public class ConversationController {
             Conversation conversation = conversationService.create();
             conversationId = conversation.getConversationId();
             response.setHeader("X-Conversation-Id", conversationId);
-            conversationService.generateTitleAsync(conversationId, message);
+            response.setHeader("Access-Control-Expose-Headers", "X-Conversation-Id");
+            conversationService.generateTitleAsync(conversationId, conversation.getUserId(), message);
         }
         return conversationService.chat(message, conversationId);
     }
@@ -39,6 +40,16 @@ public class ConversationController {
     @AuthRequired
     public ApiResult<List<Conversation>> list() {
         return ApiResult.success(conversationService.listByUserId(UserContext.getUserId()));
+    }
+
+    @GetMapping("/{conversationId}")
+    @AuthRequired
+    public ApiResult<Conversation> getConversation(@PathVariable String conversationId) {
+        Conversation conversation = conversationService.getByConversationId(conversationId);
+        if (conversation == null) {
+            return ApiResult.error(404, "会话不存在");
+        }
+        return ApiResult.success(conversation);
     }
 
     @GetMapping("/messages/{conversationId}")

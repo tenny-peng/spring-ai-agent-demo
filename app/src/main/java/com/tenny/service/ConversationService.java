@@ -11,11 +11,13 @@ public interface ConversationService extends IService<Conversation> {
 
     Conversation create();
 
-    void generateTitleAsync(String conversationId, String firstQuery);
+    void generateTitleAsync(String conversationId, Long userId, String firstQuery);
 
-    Flux<String> chat(String query, String conversationId);
+    Flux<String> chat(String message, String conversationId);
 
     List<Conversation> listByUserId(Long userId);
+
+    Conversation getByConversationId(String conversationId);
 
     Map<String, Object> getMessages(String conversationId);
 

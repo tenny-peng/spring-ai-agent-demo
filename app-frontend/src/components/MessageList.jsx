@@ -18,26 +18,26 @@ function MessageList({ messages, loading }) {
           key={index}
           style={{
             display: 'flex',
-            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+            justifyContent: msg.role === 'USER' ? 'flex-end' : 'flex-start',
             marginBottom: '16px',
           }}
         >
           <div style={{ display: 'flex', maxWidth: '70%', alignItems: 'flex-start' }}>
-            {msg.role !== 'user' && (
+            {msg.role !== 'USER' && (
               <Avatar icon={<RobotOutlined />} style={{ marginRight: '8px', background: '#52c41a' }} />
             )}
             <div
               style={{
                 padding: '10px 15px',
                 borderRadius: '12px',
-                background: msg.role === 'user' ? '#1677ff' : '#ffffff',
-                color: msg.role === 'user' ? '#ffffff' : '#000000',
+                background: msg.role === 'USER' ? '#1677ff' : '#ffffff',
+                color: msg.role === 'USER' ? '#ffffff' : '#000000',
                 wordBreak: 'break-word',
               }}
             >
               {msg.content}
             </div>
-            {msg.role === 'user' && (
+            {msg.role === 'USER' && (
               <Avatar icon={<UserOutlined />} style={{ marginLeft: '8px', background: '#1677ff' }} />
             )}
           </div>

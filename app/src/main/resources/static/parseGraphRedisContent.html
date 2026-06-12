@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Redis Java序列化数据解析器</title>
+</head>
+<body>
+<h3>粘贴Redis中的Value进行解析</h3>
+<textarea id="input" rows="5" cols="80" placeholder="粘贴从Redis复制出来的Base64字符串，例如：\x03\xd5\x06rO0ABXoAAAEk..."></textarea>
+<br><br>
+<button onclick="decode()">解析</button>
+<button onclick="clearAll()">清空</button>
+
+<h3>解析结果：</h3>
+<pre id="output" style="background:#f0f0f0; padding:10px; border:1px solid #ccc; min-height:200px;"></pre>
+
+<script>
+    function decode() {
+        let input = document.getElementById('input').value;
+        let output = document.getElementById('output');
+
+        // 清理输入：去掉 \x03\xd5\x06 这类前缀，只保留 Base64 部分
+        // 查找 rO0 开头的位置（Java序列化的Base64特征）
+        let base64Match = input.match(/[rR][oO][0O][a-zA-Z0-9+\/=]+/);
+        if (!base64Match) {
+            output.textContent = '错误：未找到有效的Base64数据（应以rO0开头）';
+            return;
+        }
+
+        let base64 = base64Match[0];
+        output.textContent = '提取的Base64: ' + base64 + '\n\n正在解析...\n';
+
+        try {
+            // 将Base64转换为字节数组
+            let binaryStr = atob(base64);
+            let bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) {
+                bytes[i] = binaryStr.charCodeAt(i);
+            }
+
+            // 尝试将字节数组作为UTF-8文本解析（可能能看到部分明文）
+            let utf8Text = new TextDecoder('utf-8').decode(bytes);
+
+            // 过滤可读字符
+            let readable = utf8Text.replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s\p{P}]/gu, '');
+
+            output.textContent += '可读文本提取（过滤乱码后）:\n' + readable + '\n\n';
+
+            // 尝试查找JSON片段
+            let jsonMatch = utf8Text.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
+            if (jsonMatch) {
+                output.textContent += '发现的JSON片段:\n';
+                jsonMatch.forEach((json, idx) => {
+                    try {
+                        let parsed = JSON.parse(json);
+                        output.textContent += JSON.stringify(parsed, null, 2) + '\n\n';
+                    } catch(e) {
+                        output.textContent += json + '\n\n';
+                    }
+                });
+            }
+
+            // 查找中文字符串
+            let chineseMatches = utf8Text.match(/[\u4e00-\u9fa5]+/g);
+            if (chineseMatches && chineseMatches.length > 0) {
+                output.textContent += '发现的中文内容:\n' + [...new Set(chineseMatches)].join('\n') + '\n\n';
+            }
+
+            // 查找英文单词
+            let englishMatches = utf8Text.match(/[a-zA-Z_][a-zA-Z0-9_"]{2,}/g);
+            if (englishMatches && englishMatches.length > 0) {
+                output.textContent += '发现的字段名:\n' + [...new Set(englishMatches)].join(', ') + '\n\n';
+            }
+
+            output.textContent += '\n--- 原始字节(十六进制)前200字节 ---\n';
+            let hex = Array.from(bytes.slice(0, 200)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            output.textContent += hex;
+
+            if (bytes.length > 200) {
+                output.textContent += ' ... (共' + bytes.length + '字节)';
+            }
+
+        } catch(e) {
+            output.textContent = '解码失败: ' + e.message;
+        }
+    }
+
+    function clearAll() {
+        document.getElementById('input').value = '';
+        document.getElementById('output').textContent = '';
+    }
+</script>
+</body>
+</html>

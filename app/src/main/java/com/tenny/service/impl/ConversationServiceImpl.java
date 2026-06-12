@@ -1,7 +1,6 @@
 package com.tenny.service.impl;
 
 import com.alibaba.cloud.ai.graph.CompiledGraph;
-import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.state.StateSnapshot;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
@@ -14,19 +13,21 @@ import com.tenny.entity.Conversation;
 import com.tenny.mapper.ConversationMapper;
 import com.tenny.service.ConversationService;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -34,11 +35,13 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
     private final CompiledGraph compiledGraph;
     private final ChatClient chatClient;
+    private final RedissonClient redissonClient;
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
 
-    public ConversationServiceImpl(CompiledGraph compiledGraph, ChatModel chatModel) {
+    public ConversationServiceImpl(CompiledGraph compiledGraph, ChatModel chatModel, RedissonClient redissonClient) {
         this.compiledGraph = compiledGraph;
         this.chatClient = ChatClient.builder(chatModel).build();
+        this.redissonClient = redissonClient;
     }
 
     @Override
@@ -57,7 +60,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     }
 
     @Override
-    public void generateTitleAsync(String conversationId, String firstQuery) {
+    public void generateTitleAsync(String conversationId, Long userId, String firstQuery) {
         Conversation conversation = this.getOne(new LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId));
         if (conversation == null || !ChatConstants.DEFAULT_TITLE.equals(conversation.getTitle())) {
             return;
@@ -65,7 +68,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         executor.submit(() -> {
             try {
                 String title = generateTitleByAI(firstQuery);
-                update(new LambdaUpdateWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId).set(Conversation::getTitle, title));
+                update(new LambdaUpdateWrapper<Conversation>().eq(Conversation::getUserId, userId).eq(Conversation::getConversationId, conversationId).set(Conversation::getTitle, title));
                 log.info("会话标题生成成功: {} -> {}", conversationId, title);
             } catch (Exception e) {
                 log.error("生成标题失败: {}", e.getMessage());
@@ -101,7 +104,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     }
 
     @Override
-    public Flux<String> chat(String query, String conversationId) {
+    public Flux<String> chat(String message, String conversationId) {
         assert conversationId != null;
 
         RunnableConfig config = RunnableConfig.builder()
@@ -110,7 +113,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
         StringBuilder fullResponse = new StringBuilder();
 
-        return compiledGraph.stream(Map.of("query", query), config)
+        return compiledGraph.stream(Map.of("message", message), config)
                 .ofType(StreamingOutput.class)
                 .map(so -> {
                     Object data = so.getOriginData();
@@ -124,8 +127,46 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                 .doFinally(signalType -> {
                     if (!fullResponse.isEmpty()) {
                         log.info("assistant: {}", fullResponse.toString());
+                        saveConversationState(conversationId, fullResponse.toString());
                     }
                 });
+    }
+
+    private void saveConversationState(String threadId, String assistantMessage) {
+        RLock lock = redissonClient.getLock("graph:state:lock:" + threadId);
+
+        try {
+            if (lock.tryLock(3, 5, TimeUnit.SECONDS)) {
+                try {
+                    // 获取当前状态
+                    StateSnapshot snapshot = compiledGraph.getState(
+                            RunnableConfig.builder().threadId(threadId).build()
+                    );
+
+                    if(snapshot == null){
+                        return;
+                    }
+
+                    List<Message> messages = snapshot.state().value("messages", new ArrayList<>());
+
+                    // 避免重复添加
+                    messages.add(new AssistantMessage(assistantMessage));
+
+                    // 手动更新状态
+                    compiledGraph.updateState(
+                            RunnableConfig.builder().threadId(threadId).build(),
+                            Map.of("messages", messages)
+                    );
+
+                    log.info("手动保存会话状态成功: {}, 消息数: {}", threadId, messages.size());
+
+                } finally {
+                    lock.unlock();
+                }
+            }
+        } catch (Exception e) {
+            log.error("保存会话状态失败", e);
+        }
     }
 
     @Override
@@ -134,6 +175,11 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                 .eq(Conversation::getUserId, userId)
                 .orderByDesc(Conversation::getUpdatedAt)
                 .list();
+    }
+
+    @Override
+    public Conversation getByConversationId(String conversationId) {
+        return getOne(new  LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId));
     }
 
     @Override
@@ -150,9 +196,8 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         if (snapshot == null) {
             return Map.of("messages", List.of());
         }
-        // 从 state 中提取消息列表（根据你的实际结构）
-        List<Map<String, String>> messages = extractMessages(snapshot.state());
-        return Map.of("messages", messages);
+
+        return Map.of("messages", snapshot.state().value("messages"));
     }
 
     @Override
@@ -164,11 +209,6 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     @Override
     public void rename(String conversationId, String newTitle) {
         update(new LambdaUpdateWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId).set(Conversation::getTitle, newTitle));
-    }
-
-
-    private List<Map<String, String>> extractMessages(OverAllState state) {
-        return new ArrayList<>();
     }
 
 }
