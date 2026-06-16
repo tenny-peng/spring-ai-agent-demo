@@ -66,6 +66,22 @@ function Chat() {
       setMessages([]);
     };
 
+  // 重命名会话
+  const handleRenameSession = async (conversationId, newTitle) => {
+    const session = sessions.find(s => s.conversationId === conversationId);
+    if (session?.isTemp) return;
+
+    try {
+      await client.post('/conversation/rename', { conversationId, newTitle });
+      setSessions(prev => prev.map(s =>
+        s.conversationId === conversationId ? { ...s, title: newTitle } : s
+      ));
+      message.success('重命名成功');
+    } catch (error) {
+      message.error('重命名失败');
+    }
+  };
+
   // 删除会话
   const handleDeleteSession = async (conversationId) => {
       // 临时会话直接删除
@@ -262,6 +278,7 @@ function Chat() {
           onSelectSession={setCurrentSessionId}
           onNewSession={handleNewSession}
           onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
         />
       </Sider>
       <Layout>
