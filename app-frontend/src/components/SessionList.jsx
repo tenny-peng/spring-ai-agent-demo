@@ -1,5 +1,5 @@
 // src/components/SessionList.jsx
-import { Button, List, Avatar, Modal, Input, Tooltip } from 'antd';
+import { Button, Avatar, Modal, Input, Tooltip } from 'antd';
 import { PlusOutlined, MessageOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useState, useRef } from 'react';
 
@@ -49,36 +49,24 @@ function SessionList({ sessions, currentSessionId, onSelectSession, onNewSession
         新会话
       </Button>
 
-      <List
-        style={{ flex: 1, overflow: 'auto' }}
-        dataSource={sessions}
-        renderItem={session => (
-          <List.Item
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {sessions.map(session => (
+          <div
+            key={session.conversationId}
             onClick={() => onSelectSession(session.conversationId)}
             style={{
               cursor: 'pointer',
-              background: currentSessionId === session.conversationId ? '#e6f7ff' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
               padding: '12px 16px',
-              borderBottom: '1px solid #f0f0f0'
+              borderBottom: '1px solid #f0f0f0',
+              background: currentSessionId === session.conversationId ? '#e6f7ff' : 'transparent'
             }}
-            actions={[
-              <Tooltip title="重命名" key="edit">
-                <EditOutlined
-                  style={{ color: '#1890ff', cursor: 'pointer' }}
-                  onClick={(e) => startEdit(session, e)}
-                />
-              </Tooltip>,
-              <Tooltip title="删除" key="delete">
-                <DeleteOutlined
-                  style={{ color: '#ff4d4f', cursor: 'pointer' }}
-                  onClick={(e) => handleDelete(session.conversationId, e)}
-                />
-              </Tooltip>
-            ]}
           >
-            <List.Item.Meta
-              avatar={<Avatar icon={<MessageOutlined />} />}
-              title={editingId === session.conversationId ? (
+            <Avatar icon={<MessageOutlined />} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {editingId === session.conversationId ? (
                 <Input
                   ref={inputRef}
                   size="small"
@@ -90,12 +78,26 @@ function SessionList({ sessions, currentSessionId, onSelectSession, onNewSession
                   onClick={e => e.stopPropagation()}
                   style={{ width: '100%' }}
                 />
-              ) : session.title || '新对话'}
-              description={session.updatedAt || '刚刚'}
-            />
-          </List.Item>
-        )}
-      />
+              ) : (
+                <div style={{ fontWeight: 500, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {session.title || '新对话'}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+                {session.updatedAt || '刚刚'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+              <Tooltip title="重命名">
+                <EditOutlined style={{ color: '#1890ff', cursor: 'pointer' }} onClick={(e) => startEdit(session, e)} />
+              </Tooltip>
+              <Tooltip title="删除">
+                <DeleteOutlined style={{ color: '#ff4d4f', cursor: 'pointer' }} onClick={(e) => handleDelete(session.conversationId, e)} />
+              </Tooltip>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
