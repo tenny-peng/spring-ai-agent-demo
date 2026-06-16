@@ -25,8 +25,14 @@ public class ChatNode implements NodeAction {
         List<Message> historyMessages = state.value("messages", new ArrayList<>());
         List<Message> allMessages = new ArrayList<>(historyMessages);
         allMessages.add(new UserMessage(currentMessage));
+
+        String context = state.value("ragContext", "");
+        String systemPrompt = "你是一个有用的AI助手。";
+        if (!context.isEmpty()) {
+            systemPrompt += "\n\n以下是相关的知识库内容，请基于这些信息回答：\n" + context;
+        }
         Flux<String> assistantResponse  = chatClient.prompt()
-                .system("你是一个有用的AI助手")
+                .system(systemPrompt)
                 .messages(allMessages)
                 .stream().content();
 
