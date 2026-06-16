@@ -293,6 +293,11 @@ function Chat() {
             <h3 style={{ margin: 0 }}>智能聊天助手</h3>
             <div>
               <span style={{ marginRight: 16 }}>欢迎，{username || '用户'}！</span>
+              {localStorage.getItem('role') === 'ADMIN' && (
+                  <Button type="link" onClick={() => navigate('/admin')} style={{ marginRight: 8 }}>
+                    进入管理后台
+                  </Button>
+                )}
               <Button onClick={handleLogout}>退出登录</Button>
             </div>
           </div>

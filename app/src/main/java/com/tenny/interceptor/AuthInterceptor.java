@@ -1,10 +1,12 @@
 package com.tenny.interceptor;
 
 import com.alibaba.fastjson2.JSON;
+import com.tenny.annotation.AdminRequired;
 import com.tenny.annotation.AuthRequired;
-import com.tenny.utils.TokenUtils;
 import com.tenny.common.UserContext;
 import com.tenny.entity.dto.LoginResponse;
+import com.tenny.enums.UserRole;
+import com.tenny.utils.TokenUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +28,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (!(handler instanceof HandlerMethod hm)) {
             return true;
         }
-        if (!hm.hasMethodAnnotation(AuthRequired.class)) {
-            return true;
-        }
+        boolean requiresAuth = hm.hasMethodAnnotation(AuthRequired.class);
+        boolean requiresAdmin = hm.hasMethodAnnotation(AdminRequired.class);
+        if (!requiresAuth && !requiresAdmin) return true;
 
         String token = TokenUtils.extractToken(request);
         if (token == null) {
@@ -43,6 +45,12 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         LoginResponse loginResponse = JSON.parseObject(loginResponseStr, LoginResponse.class);
+
+        if (requiresAdmin && !UserRole.ADMIN.name().equals(loginResponse.getRole())) {
+            writeForbidden(response);
+            return false;
+        }
+
         UserContext.setUserId(loginResponse.getId());
 
         return true;
@@ -57,6 +65,13 @@ public class AuthInterceptor implements HandlerInterceptor {
         response.setContentType("application/json;charset=utf-8");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         String json = "{\"code\":401,\"message\":\"未登录或token已失效\"}";
+        response.getWriter().write(json);
+    }
+
+    private void writeForbidden(HttpServletResponse response) throws Exception {
+        response.setContentType("application/json;charset=utf-8");
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);  // 403
+        String json = "{\"code\":403,\"message\":\"无权限访问\"}";
         response.getWriter().write(json);
     }
 }

@@ -25,7 +25,7 @@ function Register() {
             email: values.email,
             password: values.password
           });
-debugger
+
           if (response.code === 0) {
             message.success('注册成功！正在跳转到登录页...');
             setTimeout(() => navigate('/login'), 2000);

@@ -1,5 +1,6 @@
 package com.tenny.controller.admin;
 
+import com.tenny.annotation.AdminRequired;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -18,12 +19,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@RequestMapping("/admin/document")
+@RequestMapping("/api/admin/document")
 @RequiredArgsConstructor
 public class DocumentController {
 
     private final VectorStore vectorStore;
 
+    @AdminRequired
     @GetMapping("importData")
     public String importData(){
         try {

@@ -24,6 +24,7 @@ function Login() {
           const loginData = response.data;
           localStorage.setItem('token', loginData.token);
           localStorage.setItem('username', loginData.username);
+          localStorage.setItem('role', loginData.role);
           message.success('登录成功！');
           navigate('/');
       } else {

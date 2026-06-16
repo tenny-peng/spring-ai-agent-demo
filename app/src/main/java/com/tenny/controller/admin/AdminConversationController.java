@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/admin/conversation")
+@RequestMapping("/api/admin/conversation")
 @RequiredArgsConstructor
 public class AdminConversationController {
 
