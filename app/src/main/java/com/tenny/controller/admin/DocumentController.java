@@ -3,6 +3,7 @@ package com.tenny.controller.admin;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tenny.annotation.AdminRequired;
 import com.tenny.common.ApiResult;
+import com.tenny.entity.dto.DocumentChunkVO;
 import com.tenny.entity.dto.DocumentPageReq;
 import com.tenny.entity.dto.DocumentPageVO;
 import com.tenny.service.DocumentService;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/document")
@@ -46,9 +48,16 @@ public class DocumentController {
     }
 
     @DeleteMapping("delete/{id}")
+    @AdminRequired
     public ApiResult<?> delete(@PathVariable("id") Long id) {
         documentService.delete(id);
         return ApiResult.success();
+    }
+
+    @GetMapping("detail/{id}")
+    @AdminRequired
+    public ApiResult<List<DocumentChunkVO>> detail(@PathVariable Long id) {
+        return ApiResult.success(documentService.getDetail(id));
     }
 
 }

@@ -9,6 +9,7 @@ import com.tenny.common.UserContext;
 import com.tenny.entity.Document;
 import com.tenny.entity.DocumentChunk;
 import com.tenny.entity.User;
+import com.tenny.entity.dto.DocumentChunkVO;
 import com.tenny.entity.dto.DocumentPageReq;
 import com.tenny.entity.dto.DocumentPageVO;
 import com.tenny.enums.DocumentStatus;
@@ -157,6 +158,18 @@ public class DocumentServiceImpl extends ServiceImpl<DocumentMapper, Document> i
         vectorStore.delete(vectorIds);
         documentChunkService.remove(new LambdaQueryWrapper<DocumentChunk>().eq(DocumentChunk::getDocumentId, id));
         this.removeById(id);
+    }
+
+    @Override
+    public List<DocumentChunkVO> getDetail(Long id) {
+        Document doc = this.getById(id);
+        if (doc == null) throw new BusinessException("文档不存在");
+        List<DocumentChunk> documentChunks = documentChunkService.list(new LambdaQueryWrapper<DocumentChunk>().eq(DocumentChunk::getDocumentId, id));
+        return documentChunks.stream().map(documentChunk -> {
+            DocumentChunkVO vo = new DocumentChunkVO();
+            BeanUtils.copyProperties(documentChunk, vo);
+            return vo;
+        }).toList();
     }
 
 }

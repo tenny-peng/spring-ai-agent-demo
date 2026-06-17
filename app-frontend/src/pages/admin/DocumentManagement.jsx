@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Upload, message, Modal, Space } from 'antd';
+import { Card, Table, Button, Upload, message, Modal, Space, Drawer } from 'antd';
 import { UploadOutlined, DownloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import { adminApi } from '../../api/admin';
 
@@ -7,6 +7,9 @@ function DocumentManagement() {
   const [data, setData] = useState({ records: [], total: 0 });
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailChunks, setDetailChunks] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [params, setParams] = useState({ page: 1, size: 20 });
 
   const loadData = useCallback(async () => {
@@ -57,6 +60,17 @@ function DocumentManagement() {
     });
   };
 
+const handleDetail = async (id) => {
+  setDetailOpen(true);
+  setDetailLoading(true);
+  try {
+    const res = await adminApi.getDocumentDetail(id);
+    setDetailChunks(res.data);
+  } finally {
+    setDetailLoading(false);
+  }
+};
+
   const columns = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '文件名', dataIndex: 'filename', ellipsis: true },
@@ -67,16 +81,13 @@ function DocumentManagement() {
     },
     { title: '上传者', dataIndex: 'uploadedByName', width: 120 },
     { title: '上传时间', dataIndex: 'createdAt', width: 180 },
-    { title: '操作', width: 100,
+    { title: '操作', width: 180,
       render: (_, record) => (
-        <Button
-          type="link"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleDelete(record.id, record.filename)}
-        >
-          删除
-        </Button>
+        <Space>
+          <Button type="link" onClick={() => handleDetail(record.id)}>详情</Button>
+          <Button type="link" danger icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.id, record.filename)}>删除</Button>
+        </Space>
       ),
     },
   ];
@@ -110,6 +121,26 @@ function DocumentManagement() {
           onChange: (page, size) => setParams(p => ({ ...p, page, size })),
         }}
       />
+      <Drawer
+        title="文档详情"
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        size={600}
+        loading={detailLoading}
+      >
+        {detailChunks.map(chunk => (
+          <Card
+            key={chunk.chunkIndex}
+            size="small"
+            title={`#${chunk.chunkIndex + 1}`}
+            style={{ marginBottom: 8 }}
+          >
+            <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontSize: 13 }}>
+              {chunk.content}
+            </pre>
+          </Card>
+        ))}
+      </Drawer>
     </Card>
   );
 }

@@ -8,4 +8,5 @@ export const adminApi = {
   getDocuments: (params) => client.post('/admin/document/pageList', params),
   uploadDocument: (formData) => client.post('/admin/document/upload', formData),
   deleteDocument: (id) => client.delete(`/admin/document/delete/${id}`),
+  getDocumentDetail: (id) => client.get(`/admin/document/detail/${id}`),
 };
