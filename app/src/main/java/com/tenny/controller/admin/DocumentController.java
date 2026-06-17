@@ -1,64 +1,54 @@
 package com.tenny.controller.admin;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tenny.annotation.AdminRequired;
+import com.tenny.common.ApiResult;
+import com.tenny.entity.dto.DocumentPageReq;
+import com.tenny.entity.dto.DocumentPageVO;
+import com.tenny.service.DocumentService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.VectorStore;
+import org.apache.tomcat.util.http.fileupload.IOUtils;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/document")
 @RequiredArgsConstructor
 public class DocumentController {
 
-    private final VectorStore vectorStore;
+    private final DocumentService documentService;
+
+    @GetMapping("/template")
+    public void downloadTemplate(HttpServletResponse response) throws IOException {
+        response.setContentType("text/csv;charset=utf-8");
+        response.setHeader("Content-Disposition", "attachment; filename=import_template.csv");
+        // 从 resources 读取
+        ClassPathResource resource = new ClassPathResource("QA_template.csv");
+        IOUtils.copy(resource.getInputStream(), response.getOutputStream());
+    }
 
     @AdminRequired
-    @GetMapping("importData")
-    public String importData(){
-        try {
-            ClassPathResource resource = new ClassPathResource("qa.csv");
-            InputStreamReader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
-            CSVParser csvParser = CSVFormat.DEFAULT
-                    .builder()
-                    .setHeader()
-                    .setSkipHeaderRecord(true)
-                    .build()
-                    .parse(reader);
+    @PostMapping("upload")
+    public ApiResult<?> upload(@RequestParam("file") MultipartFile file){
+        if (file.isEmpty()) return ApiResult.error(400, "文件为空");
+        documentService.upload(file);
+        return ApiResult.success();
+    }
 
-            List<Document> documents = new ArrayList<>();
+    @PostMapping("/pageList")
+    @AdminRequired
+    public ApiResult<Page<DocumentPageVO>> pageList(@RequestBody DocumentPageReq req) {
+        return ApiResult.success(documentService.getDocumentPage(req));
+    }
 
-            for (CSVRecord record : csvParser) {
-                String question = record.get("问题");
-                String answer = record.get("答案");
-
-                // 组合成文档内容
-                String content = String.format("问题：%s\n答案：%s", question, answer);
-                Document document = new Document(content);
-                documents.add(document);
-            }
-
-            csvParser.close();
-            reader.close();
-
-            vectorStore.add(documents);
-
-            return "成功导入" + documents.size() + "条记录到向量数据库";
-        } catch (IOException e) {
-            return("加载 CSV 文件失败: " + e.getMessage());
-        }
+    @DeleteMapping("delete/{id}")
+    public ApiResult<?> delete(@PathVariable("id") Long id) {
+        documentService.delete(id);
+        return ApiResult.success();
     }
 
 }

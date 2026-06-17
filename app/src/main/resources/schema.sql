@@ -25,3 +25,26 @@ CREATE TABLE IF NOT EXISTS `conversation` (
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- 文档记录（一个文件对应一条记录）
+CREATE TABLE IF NOT EXISTS `document` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `filename` VARCHAR(255) NOT NULL,          -- 原始文件名
+    `file_type` VARCHAR(20) DEFAULT 'CSV',      -- 文件类型: CSV, TXT
+    `chunk_count` INT DEFAULT 0,               -- 导入到向量库的切片数
+    `status` VARCHAR(20) DEFAULT 'COMPLETED',   -- IMPORTING / COMPLETED / FAILED
+    `uploaded_by` BIGINT,                      -- 上传者 User.id
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 文档切片记录（文件里的每一行/每一段对应一条记录）
+CREATE TABLE IF NOT EXISTS `document_chunk` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `document_id` BIGINT NOT NULL,             -- FK -> document.id
+    `vector_id` VARCHAR(128) NOT NULL,          -- Redis VectorStore 中的 Document ID
+    `content` TEXT,                             -- 切片内容（QA 对）
+    `chunk_index` INT,                          -- 序号
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

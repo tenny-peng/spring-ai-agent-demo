@@ -21,24 +21,15 @@ public class AuthController {
 
     @PostMapping("/register")
     public ApiResult<?> register(@RequestBody AuthRequest request) {
-        try {
-            User user = userService.register(request.getUsername(), request.getEmail(), request.getPassword());
-            LoginResponse loginResponse = new LoginResponse();
-            BeanUtils.copyProperties(user, loginResponse);
-            return ApiResult.success(loginResponse);
-        } catch (RuntimeException e) {
-            return ApiResult.error(400, e.getMessage());
-        }
+        User user = userService.register(request.getUsername(), request.getEmail(), request.getPassword());
+        LoginResponse loginResponse = new LoginResponse();
+        BeanUtils.copyProperties(user, loginResponse);
+        return ApiResult.success(loginResponse);
     }
 
     @PostMapping("/login")
     public ApiResult<?> login(@RequestBody AuthRequest request) {
-        try {
-            LoginResponse loginResponse = userService.login(request.getUsername(), request.getPassword());
-            return ApiResult.success(loginResponse);
-        } catch (RuntimeException e) {
-            return ApiResult.error(401, e.getMessage());
-        }
+        return ApiResult.success(userService.login(request.getUsername(), request.getPassword()));
     }
 
     @PostMapping("/logout")
