@@ -179,6 +179,7 @@ function Chat() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let currentDataParts = [];
 
         while (true) {
           const { done, value } = await reader.read();
@@ -192,17 +193,30 @@ function Chat() {
 
           for (const line of lines) {
             if (line.startsWith('data:')) {
-              const data = line.slice(5).trim();
-
-              setMessages(prev => {
-                const newMessages = [...prev];
-                if (newMessages[aiMessageIndex]) {
-                  newMessages[aiMessageIndex].content += data;
-                }
-                return newMessages;
-              });
+              currentDataParts.push(line.slice(5));
+            }else if (line === '' && currentDataParts.length > 0){
+                const reconstructedData = currentDataParts.join('\n');
+                setMessages(prev => {
+                    const newMessages = [...prev];
+                    if (newMessages[aiMessageIndex]) {
+                      newMessages[aiMessageIndex].content += reconstructedData;
+                    }
+                    return newMessages;
+                });
+                currentDataParts = [];
             }
           }
+        }
+        // 流结束时可能还有未 flush 的数据（最后事件无尾随 \n\n）
+        if (currentDataParts.length > 0) {
+          const reconstructedData = currentDataParts.join('\n');
+          setMessages(prev => {
+            const newMessages = [...prev];
+            if (newMessages[aiMessageIndex]) {
+              newMessages[aiMessageIndex].content += reconstructedData;
+            }
+            return newMessages;
+          });
         }
       } catch (error) {
         console.error('SSE 错误:', error);
