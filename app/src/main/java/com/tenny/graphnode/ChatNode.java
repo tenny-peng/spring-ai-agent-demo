@@ -2,11 +2,10 @@ package com.tenny.graphnode;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.tenny.tools.WebSearchTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
 import reactor.core.publisher.Flux;
-import com.tenny.tools.WebSearchTool;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,10 +25,7 @@ public class ChatNode implements NodeAction {
     @Override
     public Map<String, Object> apply(OverAllState state) {
         Boolean webSearchEnabled = state.value("webSearchEnabled", false);
-        String currentMessage = state.value("message", "");
         List<Message> historyMessages = state.value("messages", new ArrayList<>());
-        List<Message> allMessages = new ArrayList<>(historyMessages);
-        allMessages.add(new UserMessage(currentMessage));
 
         String context = state.value("ragContext", "");
         String systemPrompt = "你是一个无所不知的AI助手，知识实时更新。"
@@ -51,13 +47,13 @@ public class ChatNode implements NodeAction {
         }
         var promptBuilder = chatClient.prompt()
                 .system(systemPrompt)
-                .messages(allMessages);
+                .messages(historyMessages);
         if (Boolean.TRUE.equals(webSearchEnabled)) {
-            promptBuilder.tools(webSearchTool);  // 条件注册
+            promptBuilder.tools(webSearchTool);
         }
         Flux<String> assistantResponse  = promptBuilder
                 .stream().content();
 
-        return Map.of("messages", allMessages, "assistant", assistantResponse);
+        return Map.of("assistant", assistantResponse);
     }
 }

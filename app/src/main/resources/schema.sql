@@ -26,6 +26,15 @@ CREATE TABLE IF NOT EXISTS `conversation` (
     INDEX `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `message` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `conversation_id` VARCHAR(64) NOT NULL,
+    `role` VARCHAR(10) NOT NULL,
+    `content` TEXT NOT NULL,
+    `created_at` DATETIME NOT NULL,
+    INDEX `idx_conversation_id` (`conversation_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 文档记录（一个文件对应一条记录）
 CREATE TABLE IF NOT EXISTS `document` (

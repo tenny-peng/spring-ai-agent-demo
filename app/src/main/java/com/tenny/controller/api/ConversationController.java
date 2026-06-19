@@ -31,10 +31,10 @@ public class ConversationController {
         String message = req.getMessage();
         if(StringUtils.isEmpty(conversationId) || conversationId.startsWith("temp_")){
             Conversation conversation = conversationService.create();
-            conversationId = conversation.getConversationId();
-            response.setHeader("X-Conversation-Id", conversationId);
+            req.setConversationId(conversation.getConversationId());
+            response.setHeader("X-Conversation-Id", req.getConversationId());
             response.setHeader("Access-Control-Expose-Headers", "X-Conversation-Id");
-            conversationService.generateTitleAsync(conversationId, conversation.getUserId(), message);
+            conversationService.generateTitleAsync(req.getConversationId(), conversation.getUserId(), message);
         }
         return conversationService.chat(req);
     }
@@ -45,7 +45,7 @@ public class ConversationController {
         return ApiResult.success(conversationService.listByUserId(UserContext.getUserId()));
     }
 
-    @GetMapping("/{conversationId}")
+    @GetMapping("getOne/{conversationId}")
     @AuthRequired
     public ApiResult<Conversation> getConversation(@PathVariable String conversationId) {
         Conversation conversation = conversationService.getByConversationId(conversationId);

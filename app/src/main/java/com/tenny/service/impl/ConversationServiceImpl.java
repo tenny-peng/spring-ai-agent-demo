@@ -2,7 +2,6 @@ package com.tenny.service.impl;
 
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
-import com.alibaba.cloud.ai.graph.state.StateSnapshot;
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -10,25 +9,30 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tenny.common.ChatConstants;
 import com.tenny.common.UserContext;
 import com.tenny.entity.Conversation;
+import com.tenny.entity.Message;
 import com.tenny.entity.dto.ConversationReq;
+import com.tenny.enums.MessageRole;
 import com.tenny.mapper.ConversationMapper;
 import com.tenny.service.ConversationService;
+import com.tenny.service.MessageService;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
+import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,11 +42,13 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     private final ChatClient chatClient;
     private final RedissonClient redissonClient;
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
+    private final MessageService messageService;
 
-    public ConversationServiceImpl(CompiledGraph compiledGraph, ChatModel chatModel, RedissonClient redissonClient) {
+    public ConversationServiceImpl(CompiledGraph compiledGraph, ChatModel chatModel, RedissonClient redissonClient, MessageService messageService) {
         this.compiledGraph = compiledGraph;
         this.chatClient = ChatClient.builder(chatModel).build();
         this.redissonClient = redissonClient;
+        this.messageService = messageService;
     }
 
     @Override
@@ -108,14 +114,41 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     public Flux<String> chat(ConversationReq req) {
         assert req.getConversationId() != null;
 
+        // 流开始前：先存用户消息到 MySQL
+        Message userMsg = new Message();
+        userMsg.setUserId(UserContext.getUserId());
+        userMsg.setConversationId(req.getConversationId());
+        userMsg.setRole(MessageRole.USER.name());
+        userMsg.setContent(req.getMessage());
+        userMsg.setCreatedAt(LocalDateTime.now());
+        messageService.save(userMsg);
+        // 更新会话消息数+1
+        lambdaUpdate()
+                .eq(Conversation::getUserId, UserContext.getUserId())
+                .eq(Conversation::getConversationId, req.getConversationId())
+                .setSql("message_count = message_count + 1")
+                .update();
+
         RunnableConfig config = RunnableConfig.builder()
                 .threadId(req.getConversationId())
                 .build();
 
         StringBuilder fullResponse = new StringBuilder();
 
+        List<Message> messageList = getMessageList(req.getConversationId());
+        List<org.springframework.ai.chat.messages.Message> historyMessages = messageList.stream()
+                .map(msg -> {
+                    if (MessageRole.USER.name().equals(msg.getRole())) {
+                        return new UserMessage(msg.getContent());
+                    } else {
+                        return new AssistantMessage(msg.getContent());
+                    }
+                })
+                .collect(Collectors.toList());
+
         return compiledGraph.stream(Map.of(
                 "message", req.getMessage(),
+                "messages", historyMessages,
                 "webSearchEnabled", req.getWebSearchEnabled() != null && req.getWebSearchEnabled()
                 ), config)
                 .ofType(StreamingOutput.class)
@@ -131,45 +164,22 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                 .doFinally(signalType -> {
                     if (!fullResponse.isEmpty()) {
 //                        log.info("assistant: {}", fullResponse.toString());
-                        saveConversationState(req.getConversationId(), fullResponse.toString());
+                        // 流结束后：存 AI 回复到 MySQL
+                        Message assistantMsg = new Message();
+                        assistantMsg.setUserId(userMsg.getUserId());
+                        assistantMsg.setConversationId(req.getConversationId());
+                        assistantMsg.setRole(MessageRole.ASSISTANT.name());
+                        assistantMsg.setContent(fullResponse.toString());
+                        assistantMsg.setCreatedAt(LocalDateTime.now());
+                        messageService.save(assistantMsg);
+                        // 更新会话消息数+1
+                        lambdaUpdate()
+                                .eq(Conversation::getUserId, userMsg.getUserId())
+                                .eq(Conversation::getConversationId, req.getConversationId())
+                                .setSql("message_count = message_count + 1")
+                                .update();
                     }
                 });
-    }
-
-    private void saveConversationState(String threadId, String assistantMessage) {
-        RLock lock = redissonClient.getLock("graph:state:lock:" + threadId);
-
-        try {
-            if (lock.tryLock(3, 5, TimeUnit.SECONDS)) {
-                try {
-                    // 获取当前状态
-                    StateSnapshot snapshot = compiledGraph.getState(
-                            RunnableConfig.builder().threadId(threadId).build()
-                    );
-
-                    if(snapshot == null){
-                        return;
-                    }
-
-                    List<Message> messages = snapshot.state().value("messages", new ArrayList<>());
-
-                    messages.add(new AssistantMessage(assistantMessage));
-
-                    // 手动更新状态
-                    compiledGraph.updateState(
-                            RunnableConfig.builder().threadId(threadId).build(),
-                            Map.of("messages", messages)
-                    );
-
-                    log.info("手动保存会话状态成功: {}, 消息数: {}", threadId, messages.size());
-
-                } finally {
-                    lock.unlock();
-                }
-            }
-        } catch (Exception e) {
-            log.error("保存会话状态失败", e);
-        }
     }
 
     @Override
@@ -187,27 +197,41 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
     @Override
     public Map<String, Object> getMessages(String conversationId) {
-        Conversation conversation = getOne(new LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId));
-        if(conversation == null){
-            return Map.of("messages", List.of());
-        }
-        RunnableConfig config = RunnableConfig.builder()
-                .threadId(conversationId)
-                .build();
+        List<Message> msgList = getMessageList(conversationId);
+        return Map.of("messages", msgList);
+    }
 
-        try {
-            StateSnapshot snapshot = compiledGraph.getState(config);
-            return Map.of("messages", snapshot.state().value("messages"));
-        } catch (Exception e) {
-            log.warn("获取会话状态失败，会话可能没有消息: {}", conversationId);
-            return Map.of("messages", List.of());
-        }
+    private List<Message> getMessageList(String conversationId) {
+        return messageService.list(
+                new LambdaQueryWrapper<Message>()
+                        .eq(Message::getUserId, UserContext.getUserId())
+                        .eq(Message::getConversationId, conversationId)
+                        .orderByAsc(Message::getCreatedAt)
+        );
     }
 
     @Override
     @Transactional
     public void deleteByConversationId(String conversationId) {
+        // 1. 删 MySQL
+        messageService.remove(new LambdaQueryWrapper<Message>().eq(Message::getUserId, UserContext.getUserId()).eq(Message::getConversationId, conversationId));
         remove(new LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId));
+
+        // 2. 删 Redis checkpoint
+        String metaKey = "graph:thread:meta:" + conversationId;
+
+        // 用 Redisson RMap 读取 meta 内容
+        RMap<String, String> meta = redissonClient.getMap(metaKey);
+        String checkpointId = meta.get("thread_id");
+
+        if (checkpointId != null) {
+            redissonClient.getKeys().delete(
+                    "graph:checkpoint:content:" + checkpointId,
+                    "graph:thread:reverse:" + checkpointId
+            );
+        }
+
+        redissonClient.getKeys().delete(metaKey);
     }
 
     @Override

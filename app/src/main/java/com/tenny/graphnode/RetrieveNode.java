@@ -2,7 +2,6 @@ package com.tenny.graphnode;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.tenny.common.UserContext;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -21,7 +20,6 @@ public class RetrieveNode implements NodeAction {
 
     public Map<String, Object> apply(OverAllState state) {
         String query = state.value("message", "");
-        Long userId = UserContext.getUserId();
         
         List<Document> docs = vectorStore.similaritySearch(
             SearchRequest.builder()

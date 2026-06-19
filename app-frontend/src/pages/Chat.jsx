@@ -40,8 +40,8 @@ function Chat() {
       const response = await client.get(`/conversation/messages/${conversationId}`);
       const messagesData = response.data?.messages || [];
       const formattedMessages = messagesData.map(msg => ({
-        role: msg.messageType === 'USER' ? 'USER' : 'ASSISTANT',
-        content: msg.text
+        role: msg.role,
+        content: msg.content
       }));
       setMessages(formattedMessages);
     } catch (error) {
@@ -240,7 +240,7 @@ function Chat() {
       const timer = setInterval(async () => {
         try {
           // ⭐ 只获取这一个会话的信息
-          const response = await client.get(`/conversation/${conversationId}`);
+          const response = await client.get(`/conversation/getOne/${conversationId}`);
           const session = response.data;
 
           // 检查标题是否已更新（不再是"新对话"）
