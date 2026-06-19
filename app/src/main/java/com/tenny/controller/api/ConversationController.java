@@ -6,6 +6,7 @@ import com.tenny.common.ApiResult;
 import com.tenny.common.UserContext;
 import com.tenny.entity.Conversation;
 import com.tenny.entity.dto.ChangeTitleReq;
+import com.tenny.entity.dto.ConversationReq;
 import com.tenny.service.ConversationService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +24,11 @@ public class ConversationController {
 
     private final ConversationService conversationService;
 
-    @GetMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @AuthRequired
-    public Flux<String> chat(@RequestParam String message, @RequestParam(required = false) String conversationId, HttpServletResponse response) {
+    public Flux<String> chat(@RequestBody ConversationReq req, HttpServletResponse response) {
+        String conversationId = req.getConversationId();
+        String message = req.getMessage();
         if(StringUtils.isEmpty(conversationId) || conversationId.startsWith("temp_")){
             Conversation conversation = conversationService.create();
             conversationId = conversation.getConversationId();
@@ -33,7 +36,7 @@ public class ConversationController {
             response.setHeader("Access-Control-Expose-Headers", "X-Conversation-Id");
             conversationService.generateTitleAsync(conversationId, conversation.getUserId(), message);
         }
-        return conversationService.chat(message, conversationId);
+        return conversationService.chat(req);
     }
 
     @GetMapping("/list")

@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tenny.common.ChatConstants;
 import com.tenny.common.UserContext;
 import com.tenny.entity.Conversation;
+import com.tenny.entity.dto.ConversationReq;
 import com.tenny.mapper.ConversationMapper;
 import com.tenny.service.ConversationService;
 import lombok.extern.slf4j.Slf4j;
@@ -104,21 +105,24 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     }
 
     @Override
-    public Flux<String> chat(String message, String conversationId) {
-        assert conversationId != null;
+    public Flux<String> chat(ConversationReq req) {
+        assert req.getConversationId() != null;
 
         RunnableConfig config = RunnableConfig.builder()
-                .threadId(conversationId)
+                .threadId(req.getConversationId())
                 .build();
 
         StringBuilder fullResponse = new StringBuilder();
 
-        return compiledGraph.stream(Map.of("message", message), config)
+        return compiledGraph.stream(Map.of(
+                "message", req.getMessage(),
+                "webSearchEnabled", req.getWebSearchEnabled() != null && req.getWebSearchEnabled()
+                ), config)
                 .ofType(StreamingOutput.class)
                 .map(so -> {
                     Object data = so.getOriginData();
                     if (data instanceof String text) {
-                        log.info("text: {}", text);
+//                        log.info("text: {}", text);
                         fullResponse.append(text);
                         return text;
                     }
@@ -126,8 +130,8 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                 })
                 .doFinally(signalType -> {
                     if (!fullResponse.isEmpty()) {
-                        log.info("assistant: {}", fullResponse.toString());
-                        saveConversationState(conversationId, fullResponse.toString());
+//                        log.info("assistant: {}", fullResponse.toString());
+                        saveConversationState(req.getConversationId(), fullResponse.toString());
                     }
                 });
     }
@@ -149,7 +153,6 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
                     List<Message> messages = snapshot.state().value("messages", new ArrayList<>());
 
-                    // 避免重复添加
                     messages.add(new AssistantMessage(assistantMessage));
 
                     // 手动更新状态
@@ -192,12 +195,13 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                 .threadId(conversationId)
                 .build();
 
-        StateSnapshot snapshot = compiledGraph.getState(config);
-        if (snapshot == null) {
+        try {
+            StateSnapshot snapshot = compiledGraph.getState(config);
+            return Map.of("messages", snapshot.state().value("messages"));
+        } catch (Exception e) {
+            log.warn("获取会话状态失败，会话可能没有消息: {}", conversationId);
             return Map.of("messages", List.of());
         }
-
-        return Map.of("messages", snapshot.state().value("messages"));
     }
 
     @Override

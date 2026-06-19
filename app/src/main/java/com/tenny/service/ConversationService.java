@@ -2,6 +2,7 @@ package com.tenny.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.tenny.entity.Conversation;
+import com.tenny.entity.dto.ConversationReq;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -13,7 +14,7 @@ public interface ConversationService extends IService<Conversation> {
 
     void generateTitleAsync(String conversationId, Long userId, String firstQuery);
 
-    Flux<String> chat(String message, String conversationId);
+    Flux<String> chat(ConversationReq req);
 
     List<Conversation> listByUserId(Long userId);
 

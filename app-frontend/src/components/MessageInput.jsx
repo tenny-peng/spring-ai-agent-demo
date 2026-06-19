@@ -1,11 +1,11 @@
 // src/components/MessageInput.jsx
 import { useState } from 'react';
-import { Input, Button } from 'antd';
+import { Input, Button, Switch } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 
 const { TextArea } = Input;
 
-function MessageInput({ onSend, loading }) {
+function MessageInput({ onSend, loading, webSearchEnabled, onWebSearchChange }) {
   const [message, setMessage] = useState('');
 
   const handleSend = () => {
@@ -25,6 +25,14 @@ function MessageInput({ onSend, loading }) {
   return (
     <div style={{ padding: '16px', borderTop: '1px solid #f0f0f0', background: '#ffffff' }}>
       <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+          <Switch
+            checked={webSearchEnabled}
+            onChange={onWebSearchChange}
+            checkedChildren="联网搜索"
+            unCheckedChildren="联网搜索"
+          />
+        </div>
         <TextArea
           value={message}
           onChange={(e) => setMessage(e.target.value)}

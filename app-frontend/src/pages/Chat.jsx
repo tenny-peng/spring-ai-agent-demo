@@ -16,6 +16,7 @@ function Chat() {
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
 
@@ -128,7 +129,7 @@ function Chat() {
       let conversationIdToUse = currentSessionId;
 
       // 如果是临时会话，用临时 ID 发送（后端会自动创建并返回新 ID）
-      await sendMessageWithSSE(conversationIdToUse, content);
+      await sendMessageWithSSE(conversationIdToUse, content, webSearchEnabled);
       await loadSessions();
     } catch (error) {
       console.error('发送失败:', error);
@@ -141,7 +142,7 @@ function Chat() {
   };
 
     // SSE 流式发送消息（使用 fetch + ReadableStream）
-    const sendMessageWithSSE = async (conversationId, query) => {
+    const sendMessageWithSSE = async (conversationId, message, webSearchEnabled) => {
         setIsStreaming(true);
       const token = localStorage.getItem('token');
       const baseURL = client.defaults.baseURL;
@@ -154,11 +155,18 @@ function Chat() {
       });
 
       try {
-        const response = await fetch(`${baseURL}/conversation/chat?message=${encodeURIComponent(query)}&conversationId=${conversationId}`, {
+        const response = await fetch(`${baseURL}/conversation/chat`, {
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
             'Accept': 'text/event-stream'
-          }
+          },
+          body: JSON.stringify({
+            message: message,
+            conversationId: conversationId,
+            webSearchEnabled: webSearchEnabled
+          })
         });
 
         if (!response.ok) {
@@ -296,7 +304,7 @@ function Chat() {
         />
       </Sider>
       <Layout>
-        <Content style={{ display: 'flex', flexDirection: 'column' }}>
+        <Content style={{ display: 'flex', flexDirection: 'column',minWidth: 0  }}>
           <div style={{
             padding: '16px 24px',
             borderBottom: '1px solid #f0f0f0',
@@ -317,7 +325,12 @@ function Chat() {
           </div>
 
           <MessageList messages={messages} loading={loading} />
-          <MessageInput onSend={handleSendMessage} loading={loading} />
+          <MessageInput
+            onSend={handleSendMessage}
+            loading={loading}
+            webSearchEnabled={webSearchEnabled}
+            onWebSearchChange={setWebSearchEnabled}
+          />
         </Content>
       </Layout>
     </Layout>

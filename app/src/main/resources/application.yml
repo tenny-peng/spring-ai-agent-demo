@@ -52,3 +52,14 @@ mybatis-plus:
     db-config:
       id-type: auto
   mapper-locations: classpath*:/mapper/**/*.xml
+
+tavily:
+  api-key: ${TAVILY_API_KEY}
+  endpoint: https://api.tavily.com/search
+
+logging:
+  level:
+    com.tenny: debug
+    org.springframework.ai: debug
+    org.springframework.web.client: DEBUG
+    com.alibaba.cloud.ai.graph.executor.NodeExecutor: WARN

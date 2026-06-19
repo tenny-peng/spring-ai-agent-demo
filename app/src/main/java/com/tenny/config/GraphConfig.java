@@ -18,6 +18,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.tenny.tools.WebSearchTool;
 
 import java.util.Map;
 
@@ -30,18 +31,22 @@ public class GraphConfig {
 
     private final VectorStore vectorStore;
 
+    private final WebSearchTool webSearchTool;
+
     @Bean("chatbotGraph")
     public CompiledGraph chatbotGraph(ChatClient.Builder builder) throws GraphStateException {
         KeyStrategyFactory keyStrategyFactory = () -> Map.of(
                 "message", new ReplaceStrategy(),
                 "assistant", new ReplaceStrategy(),
-                "messages", new ReplaceStrategy()
+                "messages", new ReplaceStrategy(),
+                "ragContext", new ReplaceStrategy(),
+                "webSearchEnabled", new ReplaceStrategy()
         );
 
         StateGraph stateGraph = new StateGraph("chatbotGraph", keyStrategyFactory);
 
         stateGraph.addNode("RetrieveNode", AsyncNodeAction.node_async(new RetrieveNode(vectorStore)));
-        stateGraph.addNode("ChatNode", AsyncNodeAction.node_async(new ChatNode(builder)));
+        stateGraph.addNode("ChatNode", AsyncNodeAction.node_async(new ChatNode(builder, webSearchTool)));
 
         stateGraph.addEdge(StateGraph.START, "RetrieveNode");
         stateGraph.addEdge("RetrieveNode", "ChatNode");

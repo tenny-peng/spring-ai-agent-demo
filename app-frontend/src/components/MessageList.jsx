@@ -41,6 +41,8 @@ const markdownComponents = {
           fontSize: '0.88em',
           lineHeight: 1.5,
           margin: '8px 0',
+          wordBreak: 'break-word',
+          whiteSpace: 'pre-wrap',
         }}
       >
         <code {...props}>{children}</code>
@@ -106,7 +108,7 @@ function MessageList({ messages, loading }) {
         >
           <div style={{ display: 'flex', maxWidth: '70%', alignItems: 'flex-start' }}>
             {msg.role !== 'USER' && (
-              <Avatar icon={<RobotOutlined />} style={{ marginRight: '8px', background: '#52c41a' }} />
+              <Avatar icon={<RobotOutlined />} style={{ marginRight: '8px', background: '#52c41a', flexShrink: 0 }} />
             )}
             <div
               style={{
@@ -116,6 +118,7 @@ function MessageList({ messages, loading }) {
                 color: msg.role === 'USER' ? '#ffffff' : '#000000',
                 wordBreak: 'break-word',
                 fontSize: '14px',
+                minWidth: 0
               }}
             >
               {msg.role === 'USER' ? (
