@@ -16,9 +16,15 @@ function Chat() {
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
+      return localStorage.getItem('webSearchEnabled') === 'true';
+    });
+  const handleWebSearchChange = (checked) => {
+    setWebSearchEnabled(checked);
+    localStorage.setItem('webSearchEnabled', checked);
+  };
 
   // 加载会话列表
   const loadSessions = async () => {
@@ -51,20 +57,21 @@ function Chat() {
   };
 
     const handleNewSession = () => {
-      // 生成临时 ID（用时间戳 + 随机数）
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const tempId = createTempSession();
+      setMessages([]);
+    };
 
+    const createTempSession = () => {
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
       const tempSession = {
-        conversationId: tempId,      // 临时 ID
+        conversationId: tempId,
         title: '新对话',
         updatedAt: new Date().toISOString(),
-        isTemp: true                  // 标记为临时会话
+        isTemp: true
       };
-
-      // 添加到会话列表最前面
-      setSessions([tempSession, ...sessions]);
+      setSessions(prev => [tempSession, ...prev]);
       setCurrentSessionId(tempId);
-      setMessages([]);
+      return tempId;
     };
 
   // 重命名会话
@@ -115,9 +122,9 @@ function Chat() {
 
   // 发送消息
   const handleSendMessage = async (content) => {
-    if (!currentSessionId) {
-      message.warning('请先创建一个会话');
-      return;
+    let targetId = currentSessionId;
+    if (!targetId) {
+        targetId = createTempSession();
     }
 
     const userMessage = { role: 'USER', content };
@@ -329,7 +336,7 @@ function Chat() {
             onSend={handleSendMessage}
             loading={loading}
             webSearchEnabled={webSearchEnabled}
-            onWebSearchChange={setWebSearchEnabled}
+            onWebSearchChange={handleWebSearchChange}
           />
         </Content>
       </Layout>
