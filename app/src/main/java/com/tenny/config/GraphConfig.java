@@ -10,12 +10,13 @@ import com.alibaba.cloud.ai.graph.checkpoint.savers.redis.RedisSaver;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
 import com.tenny.graphnode.ChatNode;
-import com.tenny.tools.RagTool;
+import com.tenny.graphnode.RetrieveNode;
 import com.tenny.tools.WebSearchTool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -28,9 +29,9 @@ public class GraphConfig {
 
     private final RedissonClient redissonClient;
 
-    private final WebSearchTool webSearchTool;
+    private final VectorStore vectorStore;
 
-    private final RagTool ragTool;
+    private final WebSearchTool webSearchTool;
 
     @Bean("chatbotGraph")
     public CompiledGraph chatbotGraph(ChatClient.Builder builder) throws GraphStateException {
@@ -38,14 +39,17 @@ public class GraphConfig {
                 "message", new ReplaceStrategy(),
                 "assistant", new ReplaceStrategy(),
                 "messages", new ReplaceStrategy(),
+                "ragContext", new ReplaceStrategy(),
                 "webSearchEnabled", new ReplaceStrategy()
         );
 
         StateGraph stateGraph = new StateGraph("chatbotGraph", keyStrategyFactory);
 
-        stateGraph.addNode("ChatNode", AsyncNodeAction.node_async(new ChatNode(builder, webSearchTool, ragTool)));
+        stateGraph.addNode("RetrieveNode", AsyncNodeAction.node_async(new RetrieveNode(vectorStore)));
+        stateGraph.addNode("ChatNode", AsyncNodeAction.node_async(new ChatNode(builder, webSearchTool)));
 
-        stateGraph.addEdge(StateGraph.START, "ChatNode");
+        stateGraph.addEdge(StateGraph.START, "RetrieveNode");
+        stateGraph.addEdge("RetrieveNode", "ChatNode");
         stateGraph.addEdge("ChatNode", StateGraph.END);
 
         SaverConfig saverConfig = SaverConfig.builder()

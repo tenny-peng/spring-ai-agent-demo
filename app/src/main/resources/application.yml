@@ -61,5 +61,4 @@ logging:
   level:
     com.tenny: debug
     org.springframework.ai: debug
-    org.springframework.web.client: DEBUG
     com.alibaba.cloud.ai.graph.executor.NodeExecutor: WARN

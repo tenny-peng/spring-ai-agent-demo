@@ -2,11 +2,20 @@
 import { useState } from 'react';
 import { Input, Button, Switch } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
+import { useRef, useEffect } from 'react';
 
 const { TextArea } = Input;
 
 function MessageInput({ onSend, loading, webSearchEnabled, onWebSearchChange }) {
   const [message, setMessage] = useState('');
+  const textAreaRef = useRef(null);
+
+  useEffect(() => {
+      if (!loading) {
+        // 流结束 → 自动聚焦到输入框
+        textAreaRef.current?.focus();
+      }
+    }, [loading]);
 
   const handleSend = () => {
     if (message.trim() && !loading) {
@@ -34,6 +43,7 @@ function MessageInput({ onSend, loading, webSearchEnabled, onWebSearchChange }) 
           />
         </div>
         <TextArea
+          ref={textAreaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
