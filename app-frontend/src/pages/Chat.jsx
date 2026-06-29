@@ -236,7 +236,9 @@ function Chat() {
       } catch (error) {
         console.error('SSE 错误:', error);
         throw error;
-      }
+      } finally {
+         setIsStreaming(false);
+       }
     };
 
     const startPollingTitle = (conversationId) => {

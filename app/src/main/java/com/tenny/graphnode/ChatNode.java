@@ -5,6 +5,7 @@ import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.tenny.tools.WebSearchTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -17,9 +18,12 @@ public class ChatNode implements NodeAction {
 
     private final WebSearchTool webSearchTool;
 
-    public ChatNode(ChatClient.Builder builder, WebSearchTool webSearchTool) {
+    private final ToolCallbackProvider toolCallbackProvider;
+
+    public ChatNode(ChatClient.Builder builder, WebSearchTool webSearchTool, ToolCallbackProvider toolCallbackProvider) {
         this.chatClient = builder.build();
         this.webSearchTool = webSearchTool;
+        this.toolCallbackProvider = toolCallbackProvider;
     }
 
     @Override
@@ -40,6 +44,7 @@ public class ChatNode implements NodeAction {
         }
         var promptBuilder = chatClient.prompt()
                 .system(systemPrompt)
+                .toolCallbacks(toolCallbackProvider.getToolCallbacks())
                 .messages(historyMessages);
         if (Boolean.TRUE.equals(webSearchEnabled)) {
             promptBuilder.tools(webSearchTool);

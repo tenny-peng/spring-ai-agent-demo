@@ -35,7 +35,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private static final String TOKEN_PREFIX = "token:";
     private static final long TOKEN_TTL = 7 * 24 * 60 * 60;
 
-    private RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
 
     private final ConversationMapper conversationMapper;
 

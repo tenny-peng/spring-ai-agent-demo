@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,6 +34,8 @@ public class GraphConfig {
 
     private final WebSearchTool webSearchTool;
 
+    private final ToolCallbackProvider toolCallbackProvider;
+
     @Bean("chatbotGraph")
     public CompiledGraph chatbotGraph(ChatClient.Builder builder) throws GraphStateException {
         KeyStrategyFactory keyStrategyFactory = () -> Map.of(
@@ -46,7 +49,7 @@ public class GraphConfig {
         StateGraph stateGraph = new StateGraph("chatbotGraph", keyStrategyFactory);
 
         stateGraph.addNode("RetrieveNode", AsyncNodeAction.node_async(new RetrieveNode(vectorStore)));
-        stateGraph.addNode("ChatNode", AsyncNodeAction.node_async(new ChatNode(builder, webSearchTool)));
+        stateGraph.addNode("ChatNode", AsyncNodeAction.node_async(new ChatNode(builder, webSearchTool, toolCallbackProvider)));
 
         stateGraph.addEdge(StateGraph.START, "RetrieveNode");
         stateGraph.addEdge("RetrieveNode", "ChatNode");

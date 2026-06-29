@@ -43,6 +43,12 @@ spring:
         initialize-schema: true
         index: "ai_agent_rag_index:"
         prefix: "ai_agent_rag_prefix:"
+    mcp:
+      client:
+        sse:
+          connections:
+            logistics-server:
+              url: http://localhost:8888
 
 mybatis-plus:
   configuration:
