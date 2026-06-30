@@ -3,8 +3,10 @@ package com.tenny.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tenny.common.UserContext;
 import com.tenny.entity.Message;
 import com.tenny.entity.UserMemory;
+import com.tenny.entity.dto.AddMemoryReq;
 import com.tenny.enums.MemoryCategory;
 import com.tenny.enums.MemorySource;
 import com.tenny.enums.MessageRole;
@@ -40,11 +42,11 @@ public class UserMemoryServiceImpl extends ServiceImpl<UserMemoryMapper, UserMem
     }
 
     @Override
-    public void addMemory(Long userId, String content, String category) {
+    public void addMemory(AddMemoryReq req) {
         UserMemory memory = new UserMemory();
-        memory.setUserId(userId);
-        memory.setContent(content);
-        memory.setCategory(category != null ? category : MemoryCategory.OTHER.name());
+        memory.setUserId(UserContext.getUserId());
+        memory.setContent(req.getContent());
+        memory.setCategory(req.getCategory());
         memory.setSource(MemorySource.MANUAL.name());
         memory.setConfidence(1);
         save(memory);

@@ -4,6 +4,7 @@ import com.tenny.annotation.AuthRequired;
 import com.tenny.common.ApiResult;
 import com.tenny.common.UserContext;
 import com.tenny.entity.UserMemory;
+import com.tenny.entity.dto.AddMemoryReq;
 import com.tenny.service.UserMemoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -17,17 +18,16 @@ public class UserMemoryController {
 
     private final UserMemoryService userMemoryService;
 
-    @GetMapping("/list")
+    @GetMapping("/getMemories")
     @AuthRequired
-    public ApiResult<List<UserMemory>> list() {
+    public ApiResult<List<UserMemory>> getMemories() {
         return ApiResult.success(userMemoryService.listByUserId(UserContext.getUserId()));
     }
 
     @PostMapping("/add")
     @AuthRequired
-    public ApiResult<Void> add(@RequestParam String content,
-                               @RequestParam(required = false, defaultValue = "OTHER") String category) {
-        userMemoryService.addMemory(UserContext.getUserId(), content, category);
+    public ApiResult<Void> add(@RequestBody AddMemoryReq req) {
+        userMemoryService.addMemory(req);
         return ApiResult.success(null);
     }
 

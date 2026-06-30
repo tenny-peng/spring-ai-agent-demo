@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import SessionList from '../components/SessionList';
 import MessageList from '../components/MessageList';
 import MessageInput from '../components/MessageInput';
+import UserMemoryDrawer from '../components/UserMemoryDrawer'
 import client from '../api/client';
 
 const { Sider, Content } = Layout;
@@ -18,6 +19,7 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [memoryDrawerOpen, setMemoryDrawerOpen] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
       return localStorage.getItem('webSearchEnabled') === 'true';
     });
@@ -324,6 +326,9 @@ function Chat() {
             <h3 style={{ margin: 0 }}>智能聊天助手</h3>
             <div>
               <span style={{ marginRight: 16 }}>欢迎，{username || '用户'}！</span>
+              <Button type="link" onClick={() => setMemoryDrawerOpen(true)} style={{ marginRight: 8 }}>
+                我的记忆
+              </Button>
               {localStorage.getItem('role') === 'ADMIN' && (
                   <Button type="link" onClick={() => navigate('/admin')} style={{ marginRight: 8 }}>
                     进入管理后台
@@ -342,6 +347,7 @@ function Chat() {
           />
         </Content>
       </Layout>
+      <UserMemoryDrawer open={memoryDrawerOpen} onClose={() => setMemoryDrawerOpen(false)} />
     </Layout>
   );
 }
