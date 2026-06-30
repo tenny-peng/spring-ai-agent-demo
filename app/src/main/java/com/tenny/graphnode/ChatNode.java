@@ -42,6 +42,10 @@ public class ChatNode implements NodeAction {
         if (!ragContext.isEmpty()) {
             systemPrompt += "\n\n以下是知识库内容，请酌情参考这些信息回答：\n" + ragContext;
         }
+        String userMemorySummary = state.value("userMemorySummary", "");
+        if (!userMemorySummary.isEmpty()) {
+            systemPrompt += "\n\n以下是你对用户的了解（请基于这些信息个性化回答）：\n" + userMemorySummary;
+        }
         var promptBuilder = chatClient.prompt()
                 .system(systemPrompt)
                 .toolCallbacks(toolCallbackProvider.getToolCallbacks())

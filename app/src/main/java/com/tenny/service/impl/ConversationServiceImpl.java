@@ -15,6 +15,7 @@ import com.tenny.enums.MessageRole;
 import com.tenny.mapper.ConversationMapper;
 import com.tenny.service.ConversationService;
 import com.tenny.service.MessageService;
+import com.tenny.service.UserMemoryService;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
@@ -43,12 +44,14 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     private final RedissonClient redissonClient;
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
     private final MessageService messageService;
+    private final UserMemoryService userMemoryService;
 
-    public ConversationServiceImpl(CompiledGraph compiledGraph, ChatModel chatModel, RedissonClient redissonClient, MessageService messageService) {
+    public ConversationServiceImpl(CompiledGraph compiledGraph, ChatModel chatModel, RedissonClient redissonClient, MessageService messageService, UserMemoryService userMemoryService) {
         this.compiledGraph = compiledGraph;
         this.chatClient = ChatClient.builder(chatModel).build();
         this.redissonClient = redissonClient;
         this.messageService = messageService;
+        this.userMemoryService = userMemoryService;
     }
 
     @Override
@@ -149,7 +152,9 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         return compiledGraph.stream(Map.of(
                 "message", req.getMessage(),
                 "messages", historyMessages,
-                "webSearchEnabled", req.getWebSearchEnabled() != null && req.getWebSearchEnabled()
+                "webSearchEnabled", req.getWebSearchEnabled() != null && req.getWebSearchEnabled(),
+                "userId", UserContext.getUserId(),
+                "userMemorySummary", userMemoryService.getMemoriesSummary(UserContext.getUserId())
                 ), config)
                 .ofType(StreamingOutput.class)
                 .map(so -> {
@@ -178,6 +183,9 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                                 .eq(Conversation::getConversationId, req.getConversationId())
                                 .setSql("message_count = message_count + 1")
                                 .update();
+                        // 提取用户特征
+                        userMemoryService.extractFromConversation(req.getConversationId(), userMsg.getUserId());
+
                     }
                 });
     }

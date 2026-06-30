@@ -43,7 +43,9 @@ public class GraphConfig {
                 "assistant", new ReplaceStrategy(),
                 "messages", new ReplaceStrategy(),
                 "ragContext", new ReplaceStrategy(),
-                "webSearchEnabled", new ReplaceStrategy()
+                "webSearchEnabled", new ReplaceStrategy(),
+                "userId", new ReplaceStrategy(),
+                "userMemorySummary", new ReplaceStrategy()
         );
 
         StateGraph stateGraph = new StateGraph("chatbotGraph", keyStrategyFactory);

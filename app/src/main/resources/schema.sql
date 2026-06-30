@@ -57,3 +57,17 @@ CREATE TABLE IF NOT EXISTS `document_chunk` (
     `chunk_index` INT,                          -- 序号
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `user_memory` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` BIGINT NOT NULL,
+    `content` TEXT NOT NULL COMMENT '记忆内容，如"用户喜欢简洁回答"',
+    `category` VARCHAR(32) NOT NULL DEFAULT 'OTHER' COMMENT 'PREFERENCE / PERSONAL_INFO / HABIT / OTHER',
+    `source` VARCHAR(32) NOT NULL DEFAULT 'MANUAL' COMMENT 'CHAT_EXTRACT / MANUAL / SYSTEM',
+    `source_conversation_id` VARCHAR(64) DEFAULT NULL COMMENT '来源会话ID（CHAT_EXTRACT时记录）',
+    `confidence` INT DEFAULT 1 COMMENT '置信度 1-65535',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_user_id` (`user_id`),
+    INDEX `idx_category` (`category`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户特征记忆表';
