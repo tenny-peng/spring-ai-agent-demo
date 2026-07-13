@@ -6,7 +6,7 @@ import com.tenny.annotation.AuthRequired;
 import com.tenny.common.UserContext;
 import com.tenny.entity.dto.LoginResponse;
 import com.tenny.enums.UserRole;
-import com.tenny.utils.TokenUtils;
+import com.tenny.utils.AuthTokenUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +32,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         boolean requiresAdmin = hm.hasMethodAnnotation(AdminRequired.class);
         if (!requiresAuth && !requiresAdmin) return true;
 
-        String token = TokenUtils.extractToken(request);
+        String token = AuthTokenUtils.extractToken(request);
         if (token == null) {
             writeUnauthorized(response);
             return false;

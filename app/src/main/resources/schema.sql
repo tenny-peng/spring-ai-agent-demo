@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS `conversation` (
     `title` VARCHAR(255) DEFAULT '新对话',
     `status` VARCHAR(20) DEFAULT 'ACTIVE',           -- ACTIVE, ARCHIVED
     `message_count` INT DEFAULT 0,                   -- 消息条数（方便展示）
+    `compress_summary` TEXT NULL COMMENT '会话摘要',
+    `compress_last_index` BIGINT NULL COMMENT '上次压缩到的消息ID',
+    `compress_version` INT DEFAULT 0 COMMENT '乐观锁版本号',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_user_id` (`user_id`)

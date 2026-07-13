@@ -63,6 +63,13 @@ tavily:
   api-key: ${TAVILY_API_KEY}
   endpoint: https://api.tavily.com/search
 
+ai:
+  compress:
+    max-tokens: 128000      # 模型上下文限制
+    ratio: 0.5              # 硬阈值比例（max_tokens × ratio）
+    target-ratio: 0.25      # 异步压缩目标比例（再压到阈值的一半）
+    summary-ratio: 0.1      # 摘要文字数的比例
+
 logging:
   level:
     com.tenny: debug

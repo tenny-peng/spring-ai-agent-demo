@@ -39,6 +39,10 @@ public class ChatNode implements NodeAction {
                 + "\n  · 搜索了/查询了/获取了"
                 + "\n  · 我可以/让我来/我需要"
                 + "\n  · 根据搜索结果/根据我的知识库";
+        String conversationSummary = state.value("conversationSummary", "");
+        if (!conversationSummary.isEmpty()) {
+            systemPrompt += "\n\n以下是之前的对话摘要（其中包含了历史对话的关键信息）：\n" + conversationSummary;
+        }
         if (!ragContext.isEmpty()) {
             systemPrompt += "\n\n以下是知识库内容，请酌情参考这些信息回答：\n" + ragContext;
         }

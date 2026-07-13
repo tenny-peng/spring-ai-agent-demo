@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tenny.common.ChatConstants;
 import com.tenny.common.UserContext;
+import com.tenny.config.AiCompressProperties;
 import com.tenny.entity.Conversation;
 import com.tenny.entity.Message;
 import com.tenny.entity.dto.ConversationReq;
@@ -16,6 +17,7 @@ import com.tenny.mapper.ConversationMapper;
 import com.tenny.service.ConversationService;
 import com.tenny.service.MessageService;
 import com.tenny.service.UserMemoryService;
+import com.tenny.utils.AiTokenUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RMap;
 import org.redisson.api.RedissonClient;
@@ -28,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -45,13 +48,15 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
     private final MessageService messageService;
     private final UserMemoryService userMemoryService;
+    private final AiCompressProperties aiCompressProperties;
 
-    public ConversationServiceImpl(CompiledGraph compiledGraph, ChatModel chatModel, RedissonClient redissonClient, MessageService messageService, UserMemoryService userMemoryService) {
+    public ConversationServiceImpl(CompiledGraph compiledGraph, ChatModel chatModel, RedissonClient redissonClient, MessageService messageService, UserMemoryService userMemoryService, AiCompressProperties aiCompressProperties) {
         this.compiledGraph = compiledGraph;
         this.chatClient = ChatClient.builder(chatModel).build();
         this.redissonClient = redissonClient;
         this.messageService = messageService;
         this.userMemoryService = userMemoryService;
+        this.aiCompressProperties = aiCompressProperties;
     }
 
     @Override
@@ -138,8 +143,25 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
         StringBuilder fullResponse = new StringBuilder();
 
-        List<Message> messageList = getMessageList(req.getConversationId());
-        List<org.springframework.ai.chat.messages.Message> historyMessages = messageList.stream()
+        this.compress(req.getConversationId(), UserContext.getUserId());
+        List<Message> messageList = getMessageList(req.getConversationId(), UserContext.getUserId());
+        Conversation conversation = getOne(new LambdaQueryWrapper<Conversation>()
+                .eq(Conversation::getUserId, UserContext.getUserId())
+                .eq(Conversation::getConversationId, req.getConversationId()));
+        // 如果有摘要，则不传全部消息，而是传摘要+部分消息
+        List<Message> messagesToSend;
+        String conversationSummary = conversation.getCompressSummary();
+        if (conversationSummary != null) {
+            // 有摘要：只取 compressLastIndex 之后的消息
+            messagesToSend = messageList.stream()
+                    .filter(msg -> msg.getId() > conversation.getCompressLastIndex())
+                    .collect(Collectors.toList());
+        } else {
+            // 无摘要：全部消息
+            messagesToSend = messageList;
+        }
+
+        List<org.springframework.ai.chat.messages.Message> historyMessages = messagesToSend.stream()
                 .map(msg -> {
                     if (MessageRole.USER.name().equals(msg.getRole())) {
                         return new UserMessage(msg.getContent());
@@ -152,6 +174,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         return compiledGraph.stream(Map.of(
                 "message", req.getMessage(),
                 "messages", historyMessages,
+                "conversationSummary", conversationSummary != null ? conversationSummary : "",
                 "webSearchEnabled", req.getWebSearchEnabled() != null && req.getWebSearchEnabled(),
                 "userId", UserContext.getUserId(),
                 "userMemorySummary", userMemoryService.getMemoriesSummary(UserContext.getUserId())
@@ -185,7 +208,6 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                                 .update();
                         // 提取用户特征
                         userMemoryService.extractFromConversation(req.getConversationId(), userMsg.getUserId());
-
                     }
                 });
     }
@@ -205,14 +227,14 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
     @Override
     public Map<String, Object> getMessages(String conversationId) {
-        List<Message> msgList = getMessageList(conversationId);
+        List<Message> msgList = getMessageList(conversationId, UserContext.getUserId());
         return Map.of("messages", msgList);
     }
 
-    private List<Message> getMessageList(String conversationId) {
+    private List<Message> getMessageList(String conversationId, Long userId) {
         return messageService.list(
                 new LambdaQueryWrapper<Message>()
-                        .eq(Message::getUserId, UserContext.getUserId())
+                        .eq(Message::getUserId, userId)
                         .eq(Message::getConversationId, conversationId)
                         .orderByAsc(Message::getCreatedAt)
         );
@@ -245,6 +267,68 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     @Override
     public void rename(String conversationId, String newTitle) {
         update(new LambdaUpdateWrapper<Conversation>().eq(Conversation::getUserId, UserContext.getUserId()).eq(Conversation::getConversationId, conversationId).set(Conversation::getTitle, newTitle));
+    }
+
+    @Override
+    public void compress(String conversationId, Long userId) {
+        Long maxTokens = aiCompressProperties.getMaxTokens();
+        double ratio = aiCompressProperties.getRatio();
+        double targetRatio = aiCompressProperties.getTargetRatio();
+        double summaryRatio = aiCompressProperties.getSummaryRatio();
+        int ratioToken = (int) (ratio * maxTokens);
+        int targetRatioToken = (int) (targetRatio * maxTokens);
+        List<Message> messageList = getMessageList(conversationId, userId);
+        int totalToken = AiTokenUtils.estimateToken(messageList);
+        // 1. 如果总 token ≤ ratioToken，不压缩
+        if(totalToken <= ratioToken) {
+            return;
+        }
+
+        // 2. 从最旧的消息开始一条一条 pop，直到小于压缩目标token数
+        List<Message> remaining = new ArrayList<>(messageList);
+        List<Message> pruned = new ArrayList<>();
+        int currentToken = totalToken;
+        while (currentToken > targetRatioToken && !remaining.isEmpty()) {
+            Message pop = remaining.remove(0);
+            pruned.add(pop);
+            currentToken -= AiTokenUtils.estimateToken(pop.getContent());
+        }
+        Conversation conversation = getOne(new LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, userId).eq(Conversation::getConversationId, conversationId));
+
+        // 3. 被 pop 的消息 + 旧摘要 -> 新摘要
+        String newSummary = generateSummary(conversation.getCompressSummary(), pruned, (int)(targetRatioToken * summaryRatio));
+        Long compressLastIndex = pruned.get(pruned.size() - 1).getId();
+
+        // 4. 将摘要和压缩的截止消息id存库。乐观锁是为了防止兜底主动压缩带来的同步问题
+        boolean updated = update(new LambdaUpdateWrapper<Conversation>()
+                .eq(Conversation::getId, conversation.getId())
+                .eq(Conversation::getCompressVersion, conversation.getCompressVersion())
+                .set(Conversation::getCompressSummary, newSummary)
+                .set(Conversation::getCompressLastIndex, compressLastIndex)
+                .setSql("compress_version = compress_version + 1"));
+        if (!updated) {
+            log.warn("压缩乐观锁冲突，conversationId={}，version={}",
+                    conversationId, conversation.getCompressVersion());
+        }
+    }
+
+    private String generateSummary(String existingSummary, List<Message> prunedMessages, int maxSummaryText) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("请对以下对话内容进行摘要，保留关键信息（用户意图、重要问答、已确认的事实）。");
+        if (existingSummary != null && !existingSummary.isEmpty()) {
+            prompt.append("\n\n已有的历史摘要：\n").append(existingSummary);
+        }
+        prompt.append("\n\n新增的对话内容：\n");
+        for (Message msg : prunedMessages) {
+            String role = "USER".equals(msg.getRole()) ? "用户" : "助理";
+            prompt.append(role).append("：").append(msg.getContent()).append("\n");
+        }
+        prompt.append("\n请输出更新后的摘要（"+ maxSummaryText + "字以内）：");
+
+        return chatClient.prompt()
+                .user(prompt.toString())
+                .call()
+                .content();
     }
 
 }

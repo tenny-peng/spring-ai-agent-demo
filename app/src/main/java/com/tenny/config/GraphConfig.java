@@ -42,6 +42,7 @@ public class GraphConfig {
                 "message", new ReplaceStrategy(),
                 "assistant", new ReplaceStrategy(),
                 "messages", new ReplaceStrategy(),
+                "conversationSummary", new ReplaceStrategy(),
                 "ragContext", new ReplaceStrategy(),
                 "webSearchEnabled", new ReplaceStrategy(),
                 "userId", new ReplaceStrategy(),

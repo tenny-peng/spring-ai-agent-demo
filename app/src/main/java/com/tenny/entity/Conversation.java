@@ -17,6 +17,9 @@ public class Conversation {
     private String title;
     private String status;
     private Integer messageCount;
+    private String compressSummary;
+    private Long compressLastIndex;
+    private Integer compressVersion;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

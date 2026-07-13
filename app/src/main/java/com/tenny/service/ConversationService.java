@@ -26,4 +26,6 @@ public interface ConversationService extends IService<Conversation> {
 
     void rename(String conversationId, String newTitle);
 
+    void compress(String conversationId, Long userId);
+
 }

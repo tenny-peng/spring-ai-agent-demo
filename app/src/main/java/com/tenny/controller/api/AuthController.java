@@ -4,7 +4,7 @@ import com.tenny.annotation.AuthRequired;
 import com.tenny.common.ApiResult;
 import com.tenny.entity.dto.AuthRequest;
 import com.tenny.entity.dto.LoginResponse;
-import com.tenny.utils.TokenUtils;
+import com.tenny.utils.AuthTokenUtils;
 import com.tenny.entity.User;
 import com.tenny.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,7 +35,7 @@ public class AuthController {
     @PostMapping("/logout")
     @AuthRequired
     public ApiResult<?> logout(HttpServletRequest request) {
-        String token = TokenUtils.extractToken(request);
+        String token = AuthTokenUtils.extractToken(request);
         if (token != null) {
             userService.logout(token);
         }
